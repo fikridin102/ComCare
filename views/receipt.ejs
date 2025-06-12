@@ -1,0 +1,25 @@
+<%- include('include/header') %>
+<%- include('include/navbar') %>
+
+<body class="bg-gray-100">
+    <div class="main-content" style="padding-top: 6rem; min-height: calc(100vh - 6rem);">
+        <div class="flex flex-col items-center">
+            <div class="w-full max-w-lg bg-white p-8 rounded shadow">
+                <h2 class="text-2xl font-bold mb-4 text-center">Payment Receipt</h2>
+                <hr class="mb-4">
+                <div class="mb-2"><strong>Receipt No:</strong> <%= payment._id %></div>
+                <div class="mb-2"><strong>Date:</strong> <%= payment.paymentDate ? payment.paymentDate.toLocaleDateString('en-MY') : '-' %></div>
+                <div class="mb-2"><strong>Member:</strong> <%= payment.memberId ? payment.memberId.fullname : '-' %></div>
+                <div class="mb-2"><strong>Payment Type:</strong> <%= payment.paymentType === 'khairat' ? 'Khairat Fee' : 'Maintenance Fee' %></div>
+                <div class="mb-2"><strong>Amount:</strong> RM<%= payment.amount.toFixed(2) %></div>
+                <div class="mb-2"><strong>Status:</strong> <%= payment.status %></div>
+                <div class="mb-2"><strong>Reference No:</strong> <%= payment.referenceNumber %></div>
+                <div class="mb-2"><strong>Due Date:</strong> <%= payment.dueDate ? payment.dueDate.toLocaleDateString('en-MY') : '-' %></div>
+                <hr class="my-4">
+                <div class="text-center text-gray-600">Thank you for your payment!</div>
+            </div>
+        </div>
+    </div>
+</body>
+
+<%- include('include/footer') %> 

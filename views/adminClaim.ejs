@@ -1,0 +1,116 @@
+<%- include('include/header') %>
+<%- include('include/adminnavbar') %>
+
+<body class="bg-gray-100">
+    <div class="main-content" style="padding-top: 6rem; min-height: calc(100vh - 6rem);">
+        <div class="flex flex-col items-center">
+            <div class="w-full bg-white p-6">
+                <div class="text-xl font-semibold mb-4 text-center">Khairat Claim</div>
+
+                <% if (messages.error && messages.error.length > 0) { %>
+                    <div class="bg-red-100 border border-red-400 text-red-700 px-4 py-3 rounded relative mb-4" role="alert">
+                        <span class="block sm:inline"><%= messages.error %></span>
+                    </div>
+                <% } %>
+                <% if (messages.success && messages.success.length > 0) { %>
+                    <div class="bg-green-100 border border-green-400 text-green-700 px-4 py-3 rounded relative mb-4" role="alert">
+                        <span class="block sm:inline"><%= messages.success %></span>
+                    </div>
+                <% } %>
+
+                <div class="overflow-x-auto">
+                    <table class="w-full border-collapse border border-gray-300">
+                        <thead>
+                            <tr class="bg-gray-200">
+                                <th class="border border-gray-300 px-4 py-2">Claim Date</th>
+                                <th class="border border-gray-300 px-4 py-2">Member</th>
+                                <th class="border border-gray-300 px-4 py-2">Claimed For</th>
+                                <th class="border border-gray-300 px-4 py-2">Amount</th>
+                                <th class="border border-gray-300 px-4 py-2">Status</th>
+                                <th class="border border-gray-300 px-4 py-2">Actions</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            <% if (claims && claims.length > 0) { %>
+                                <% claims.forEach(claim => { %>
+                                    <tr>
+                                        <td class="border border-gray-300 px-4 py-2"><%= new Date(claim.claimDate).toLocaleDateString() %></td>
+                                        <td class="border border-gray-300 px-4 py-2"><%= claim.memberId.fullname %></td>
+                                        <td class="border border-gray-300 px-4 py-2"><%= claim.claimedFor.name %> (<%= claim.claimedFor.type %>)</td>
+                                        <td class="border border-gray-300 px-4 py-2">RM <%= claim.amount.toFixed(2) %></td>
+                                        <td class="border border-gray-300 px-4 py-2">
+                                            <span class="badge <%= claim.status === 'Pending' ? 'bg-warning' : claim.status === 'Approved' ? 'bg-success' : 'bg-danger' %>">
+                                                <%= claim.status %>
+                                            </span>
+                                        </td>
+                                        <td class="border border-gray-300 px-4 py-2">
+                                            <a href="/adminclaim/details/<%= claim._id %>" class="btn btn-info btn-sm" title="View"><i class="bi bi-eye"></i></a>
+                                            <% if (claim.status === 'Pending') { %>
+                                                <form action="/adminclaim/<%= claim._id %>/approve" method="POST" class="d-inline">
+                                                    <input type="hidden" name="_csrf" value="<%= csrfToken %>">
+                                                    <button type="submit" class="btn btn-success btn-sm" title="Approve"><i class="bi bi-check-circle"></i></button>
+                                                </form>
+                                                <button type="button" class="btn btn-danger btn-sm" data-bs-toggle="modal" data-bs-target="#rejectModal<%= claim._id %>" title="Reject"><i class="bi bi-x-circle"></i></button>
+                                                <!-- Reject Modal -->
+                                                <div class="modal fade" id="rejectModal<%= claim._id %>" tabindex="-1">
+                                                    <div class="modal-dialog">
+                                                        <div class="modal-content">
+                                                            <div class="modal-header">
+                                                                <h5 class="modal-title">Reject Claim</h5>
+                                                                <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+                                                            </div>
+                                                            <form action="/adminclaim/reject/<%= claim._id %>" method="POST">
+                                                                <div class="modal-body">
+                                                                    <input type="hidden" name="_csrf" value="<%= csrfToken %>">
+                                                                    <div class="mb-3">
+                                                                        <label for="rejectionReason" class="form-label">Reason for Rejection</label>
+                                                                        <textarea class="form-control" id="rejectionReason" name="rejectionReason" required></textarea>
+                                                                    </div>
+                                                                </div>
+                                                                <div class="modal-footer">
+                                                                    <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancel</button>
+                                                                    <button type="submit" class="btn btn-danger">Reject Claim</button>
+                                                                </div>
+                                                            </form>
+                                                        </div>
+                                                    </div>
+                                                </div>
+                                            <% } %>
+                                        </td>
+                                    </tr>
+                                <% }); %>
+                            <% } else { %>
+                                <tr>
+                                    <td colspan="6" class="text-center border border-gray-300 px-4 py-2">No claims found</td>
+                                </tr>
+                            <% } %>
+                        </tbody>
+                    </table>
+                </div>
+
+                <% if (totalPages > 1) { %>
+                    <nav aria-label="Page navigation" class="mt-4">
+                        <ul class="pagination justify-content-center">
+                            <% if (currentPage > 1) { %>
+                                <li class="page-item">
+                                    <a class="page-link" href="/adminclaim?page=<%= currentPage - 1 %>">Previous</a>
+                                </li>
+                            <% } %>
+                            <% for(let i = 1; i <= totalPages; i++) { %>
+                                <li class="page-item <%= currentPage === i ? 'active' : '' %>">
+                                    <a class="page-link" href="/adminclaim?page=<%= i %>"><%= i %></a>
+                                </li>
+                            <% } %>
+                            <% if (currentPage < totalPages) { %>
+                                <li class="page-item">
+                                    <a class="page-link" href="/adminclaim?page=<%= currentPage + 1 %>">Next</a>
+                                </li>
+                            <% } %>
+                        </ul>
+                    </nav>
+                <% } %>
+            </div>
+        </div>
+    </div>
+</body>
+<%- include('include/footer') %> 

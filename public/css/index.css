@@ -1,0 +1,111 @@
+/* Custom Styles for ComCare Application */
+
+/* Card Styles */
+.card {
+    background: #fff;
+    border-radius: 8px;
+    box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+    padding: 1.5rem;
+    margin-bottom: 1.5rem;
+}
+
+.card-header {
+    border-bottom: 1px solid #eee;
+    padding-bottom: 1rem;
+    margin-bottom: 1rem;
+}
+
+/* Button Extensions */
+.btn-success {
+    background-color: #28a745;
+    color: white;
+}
+
+.btn-danger {
+    background-color: #dc3545;
+    color: white;
+}
+
+.btn-warning {
+    background-color: #ffc107;
+    color: #212529;
+}
+
+.btn:hover {
+    transform: translateY(-1px);
+    box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+}
+
+/* Form Extensions */
+.form-label {
+    display: block;
+    margin-bottom: 0.5rem;
+    font-weight: 500;
+}
+
+.form-control:focus {
+    border-color: #80bdff;
+    box-shadow: 0 0 0 0.2rem rgba(0,123,255,0.25);
+}
+
+/* Table Extensions */
+.table-hover tbody tr:hover {
+    background-color: #f8f9fa;
+}
+
+.table-striped tbody tr:nth-of-type(odd) {
+    background-color: rgba(0,0,0,.05);
+}
+
+/* Modal Extensions */
+.modal-header {
+    border-bottom: 1px solid #dee2e6;
+    padding-bottom: 1rem;
+    margin-bottom: 1rem;
+}
+
+.modal-footer {
+    border-top: 1px solid #dee2e6;
+    padding-top: 1rem;
+    margin-top: 1rem;
+}
+
+/* Search Bar */
+.search-container {
+    margin-bottom: 1.5rem;
+}
+
+.search-input {
+    width: 100%;
+    padding: 0.5rem 1rem;
+    border: 1px solid #ddd;
+    border-radius: 4px;
+    font-size: 1rem;
+}
+
+/* Responsive Adjustments */
+@media (max-width: 768px) {
+    .container {
+        padding: 0 10px;
+    }
+    
+    .card {
+        padding: 1rem;
+    }
+    
+    .table-responsive {
+        display: block;
+        width: 100%;
+        overflow-x: auto;
+    }
+}
+
+/* Animation */
+.fade-in {
+    animation: fadeIn 0.3s ease-in;
+}
+
+@keyframes fadeIn {
+    from { opacity: 0; }
+    to { opacity: 1; }
+} 

@@ -1,0 +1,97 @@
+<%- include('include/header') %>
+<%- include('include/navbar') %>
+
+<body class="bg-gray-100">
+    <div class="main-content" style="padding-top: 6rem; min-height: calc(100vh - 6rem);">
+  <div class="flex flex-col items-center">
+            <div class="w-full bg-white p-6">
+                <div class="text-xl font-semibold mb-4 text-center">Khairat Claim</div>
+      <% if (messages && messages.error && messages.error.length > 0) { %>
+        <div class="alert alert-danger"><%= messages.error[0] %></div>
+      <% } %>
+      <% if (messages && messages.success && messages.success.length > 0) { %>
+        <div class="alert alert-success"><%= messages.success[0] %></div>
+      <% } %>
+      <% if (claimable && claimable.length > 0) { %>
+        <table class="table table-hover">
+          <thead>
+            <tr>
+              <th>Name</th>
+              <th>Type</th>
+              <th>IC Number</th>
+              <th>Relationship</th>
+              <th>Amount</th>
+              <th>Status</th>
+              <th>Action</th>
+            </tr>
+          </thead>
+          <tbody>
+            <% claimable.forEach(item => { %>
+              <tr>
+                <td><%= item.name %> <% if(item.type === 'member'){ %><span class="badge bg-primary ms-2">Member</span><% } %></td>
+                <td><%= item.type === 'member' ? 'Member' : 'Dependant' %></td>
+                <td><%= item.ic || '-' %></td>
+                <td><%= item.relationship || (item.type === 'member' ? 'Self' : '-') %></td>
+                <td>RM<%= item.amount.toFixed(2) %></td>
+                <td><%= item.status || 'Not Claimed' %></td>
+                <td>
+                            <form method="POST" action="/memberclaim">
+                    <input type="hidden" name="_csrf" value="<%= csrfToken %>">
+                    <input type="hidden" name="claimedForId" value="<%= item.id %>">
+                    <input type="hidden" name="claimedForName" value="<%= item.name %>">
+                    <input type="hidden" name="claimedForType" value="<%= item.type %>">
+                    <input type="hidden" name="paymentId" value="<%= item.paymentId %>">
+                    <input type="hidden" name="amount" value="<%= item.amount %>">
+                    <button type="submit" class="btn btn-primary">Claim</button>
+                  </form>
+                </td>
+              </tr>
+            <% }); %>
+          </tbody>
+        </table>
+      <% } else { %>
+        <div class="alert alert-info">No khairat claims available at this time.</div>
+      <% } %>
+
+      <% if (claimHistory && Object.keys(claimHistory).length > 0) { %>
+        <div class="mt-6 w-full">
+          <h5 class="text-lg font-semibold mb-3">Claim History</h5>
+          <% Object.keys(claimHistory).forEach(function(id) { const history = claimHistory[id]; %>
+            <div class="mb-4 border rounded-lg p-3 bg-gray-50">
+              <div class="flex justify-between items-center mb-2">
+                <div>
+                  <span class="font-bold"><%= history.name %></span>
+                  <span class="badge bg-secondary ms-2"><%= history.type %></span>
+                </div>
+                <div class="text-sm">Total Claimed: <span class="font-bold">RM<%= history.totalAmount.toFixed(2) %></span></div>
+              </div>
+              <div class="overflow-x-auto">
+                <table class="table table-sm table-bordered w-full">
+                  <thead>
+                    <tr>
+                      <th>Date</th>
+                      <th>Amount</th>
+                      <th>Status</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    <% history.claims.forEach(function(claim) { %>
+                      <tr>
+                        <td><%= new Date(claim.claimDate).toLocaleDateString() %></td>
+                        <td>RM<%= claim.amount.toFixed(2) %></td>
+                        <td><span class="badge <%= claim.status === 'Pending' ? 'bg-warning' : claim.status === 'Approved' ? 'bg-success' : 'bg-danger' %>"><%= claim.status %></span></td>
+                      </tr>
+                    <% }); %>
+                  </tbody>
+                </table>
+              </div>
+            </div>
+          <% }); %>
+        </div>
+      <% } %>
+    </div>
+  </div>
+</div>
+</body>
+
+<%- include('include/footer') %>

@@ -1,0 +1,107 @@
+<%- include('include/header') %>
+<%- include('include/navbar') %>
+
+<body class="bg-gray-100">
+    <div class="main-content" style="padding-top: 6rem; min-height: calc(100vh - 6rem);">
+        <div class="flex flex-col items-center">
+            <div class="w-full bg-white p-6">
+<!-- Announcement Modal with Carousel -->
+<div class="modal fade" id="announcementModal" tabindex="-1" aria-labelledby="announcementModalLabel" aria-hidden="true">
+    <div class="modal-dialog">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h5 class="modal-title" id="announcementModalLabel">Announcements</h5>
+                <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+            </div>
+            <div class="modal-body">
+                <div id="announcementCarousel" class="carousel slide" data-bs-ride="carousel">
+                    <div class="carousel-inner" id="carouselInner">
+                        <!-- Slides will be injected here -->
+                    </div>
+                    <button class="carousel-control-prev" type="button" data-bs-target="#announcementCarousel" data-bs-slide="prev">
+                        <span class="carousel-control-prev-icon" aria-hidden="true"></span>
+                        <span class="visually-hidden">Previous</span>
+                    </button>
+                    <button class="carousel-control-next" type="button" data-bs-target="#announcementCarousel" data-bs-slide="next">
+                        <span class="carousel-control-next-icon" aria-hidden="true"></span>
+                        <span class="visually-hidden">Next</span>
+                    </button>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<% if (typeof overduePayments !== 'undefined' && overduePayments.length > 0) { %>
+    <div id="overdue-alert" class="alert alert-warning text-center mb-4"
+         style="background-color: #fff3cd; color: #856404; border: 1px solid #ffeeba; padding: 16px; border-radius: 8px; margin: 88px auto 0 auto; max-width: 900px; width: 100%; position: relative; z-index: 10;">
+        <strong>Warning:</strong> You have overdue khairat payments! Please pay as soon as possible to avoid penalties.
+        <button onclick="document.getElementById('overdue-alert').style.display='none'"
+                style="position:absolute; top:8px; right:16px; background:none; border:none; font-size:1.5rem; line-height:1; color:#856404;">&times;</button>
+    </div>
+<% } %>
+
+<div class="text-2xl font-bold mb-2 mt-8 text-center">
+    Welcome, <%= user.fullname || user.username %>!
+</div>
+<p class="text-center text-gray-600 mb-8">
+    This is your member dashboard. Here you can manage your dependants, view and pay your khairat fees, and access important announcements.
+</p>
+
+<div class="flex justify-center gap-6 mb-8">
+    <a href="/memberdependant" class="bg-blue-500 hover:bg-blue-600 text-white px-6 py-3 rounded shadow transition">Manage Dependants</a>
+    <a href="/memberpayment" class="bg-green-500 hover:bg-green-600 text-white px-6 py-3 rounded shadow transition">View/Pay Khairat Fees</a>
+    <a href="/memberclaim" class="bg-yellow-500 hover:bg-yellow-600 text-white px-6 py-3 rounded shadow transition">Claim Khairat</a>
+</div>
+
+<div class="flex justify-center gap-8 mb-8">
+    <div class="bg-white shadow rounded p-6 text-center w-64">
+        <div class="text-3xl font-bold text-red-600"><%= overduePayments ? overduePayments.length : 0 %></div>
+        <div class="text-gray-700 mt-2">Unpaid Khairat Fees</div>
+    </div>
+</div>
+
+<script>
+document.addEventListener('DOMContentLoaded', function() {
+    // Only show the modal if not already shown this session
+    if (!sessionStorage.getItem('announcementShown')) {
+        fetch('/api/announcements')
+            .then(response => response.json())
+            .then(data => {
+                if (Array.isArray(data) && data.length > 0) {
+                    const carouselInner = document.getElementById('carouselInner');
+                    carouselInner.innerHTML = '';
+                    data.forEach((announcement, idx) => {
+                        const isActive = idx === 0 ? 'active' : '';
+                        const slide = document.createElement('div');
+                        slide.className = `carousel-item ${isActive}`;
+                        slide.innerHTML = `
+                            <div style="height:420px; display:flex; flex-direction:column; align-items:center; justify-content:center; text-align:center; padding:16px;">
+                                <h2 style="font-size:2rem; font-weight:bold; margin-bottom:1rem; flex-shrink:0;">${announcement.title}</h2>
+                                <div style="height:200px; width:320px; margin-bottom:1rem; display:flex; align-items:center; justify-content:center;">
+                                    ${announcement.image 
+                                        ? `<img src="${announcement.image}" alt="Announcement Image" style="height:100%; width:100%; object-fit:cover; border-radius:12px; box-shadow:0 4px 16px rgba(0,0,0,0.15);">`
+                                        : `<div style="height:100%; width:100%; background:#f0f0f0; border-radius:12px; display:flex; align-items:center; justify-content:center; color:#bbb;">No Image</div>`}
+                                </div>
+                                <div style="font-size:1.25rem; max-height:120px; overflow:auto; flex-grow:1; width:100%;">${announcement.content}</div>
+                            </div>
+                        `;
+                        carouselInner.appendChild(slide);
+                    });
+                    // Show the modal
+                    const announcementModal = new bootstrap.Modal(document.getElementById('announcementModal'));
+                    announcementModal.show();
+                    // Mark as shown for this session
+                    sessionStorage.setItem('announcementShown', 'true');
+                }
+            })
+            .catch(error => console.error('Error fetching announcements:', error));
+    }
+});
+</script>
+            </div>
+        </div>
+    </div>
+</body>
+
+<%- include('include/footer') %>

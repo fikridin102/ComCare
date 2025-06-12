@@ -1,0 +1,429 @@
+<%- include('include/header') %>
+<%- include('include/navbar') %>
+
+<body class="bg-gray-100">
+    <style>
+        [x-cloak] { display: none !important; }
+    </style>
+
+    <div x-data="memberDependant()" x-init="init()">
+        <script>
+            function memberDependant() {
+                return {
+                    showModal: false,
+                    modalType: '',
+                    editDependantId: null,
+                    dependant: {
+                        _id: '',
+                        name: '',
+                        ic: '',
+                        birthday: '',
+                        age: '',
+                        gender: '',
+                        relationship: '',
+                        isHeir: false,
+                        heirEmail: ''
+                    },
+                    showDeleteModal: false,
+                    deleteDependantId: null,
+                    search: '',
+                    dependants: [],
+                    memberName: '',
+                    
+                    init() {
+                        const rawDependants = JSON.parse('<%- JSON.stringify(dependants || []) %>');
+                        this.dependants = rawDependants.map(d => ({
+                            ...d,
+                            _id: d._id || d.id,
+                            isHeir: d.isHeir || false,
+                            heirEmail: d.heirEmail || ''
+                        }));
+                        console.log('Initialized dependants:', this.dependants);
+                        
+                        this.memberName = '<%- user.fullname || user.username %>';
+                        
+                        this.$watch('showModal', value => {
+                            if (!value) {
+                                this.resetForm();
+                                this.editDependantId = null;
+                            }
+                        });
+
+                        this.$watch('editDependantId', id => {
+                            if (id) {
+                                const dependant = this.dependants.find(d => d._id === id);
+                                if (dependant) {
+                                    this.dependant = {
+                                        _id: dependant._id,
+                                        name: dependant.name,
+                                        ic: dependant.ic,
+                                        birthday: this.formatDate(dependant.birthday),
+                                        age: dependant.age,
+                                        gender: dependant.gender,
+                                        relationship: dependant.relationship,
+                                        isHeir: dependant.isHeir,
+                                        heirEmail: dependant.heirEmail
+                                    };
+                                    this.modalType = 'edit';
+                                }
+                            }
+                        });
+                    },
+                    
+                    calculateAge(birthDate) {
+                        if (!birthDate) return '';
+                        const today = new Date();
+                        const birth = new Date(birthDate);
+                        let age = today.getFullYear() - birth.getFullYear();
+                        const monthDiff = today.getMonth() - birth.getMonth();
+                        
+                        if (monthDiff < 0 || (monthDiff === 0 && today.getDate() < birth.getDate())) {
+                            age--;
+                        }
+                        
+                        return age;
+                    },
+                    
+                    formatDate(dateString) {
+                        if (!dateString) return '';
+                        const date = new Date(dateString);
+                        return date.toISOString().split('T')[0];
+                    },
+                    
+                    formatDisplayDate(dateString) {
+                        if (!dateString) return '';
+                        try {
+                            const date = new Date(dateString);
+                            return date.toLocaleDateString('en-MY', { 
+                                day: '2-digit',
+                                month: '2-digit',
+                                year: 'numeric'
+                            });
+                        } catch (error) {
+                            console.error('Error formatting date:', error);
+                            return dateString;
+                        }
+                    },
+                    
+                    resetForm() {
+                        this.dependant = {
+                            _id: '',
+                            name: '',
+                            ic: '',
+                            birthday: '',
+                            age: '',
+                            gender: '',
+                            relationship: '',
+                            isHeir: false,
+                            heirEmail: ''
+                        };
+                    },
+                    
+                    openAddModal() {
+                        this.modalType = 'add';
+                        this.showModal = true;
+                        this.resetForm();
+                    },
+                    
+                    openEditModal(dependantData) {
+                        console.log('Opening edit modal with data:', dependantData);
+                        if (!dependantData || !dependantData._id) {
+                            console.error('Invalid dependant data:', dependantData);
+                            return;
+                        }
+                        this.modalType = 'edit';
+                        this.showModal = true;
+                        this.dependant = {
+                            _id: dependantData._id,
+                            name: dependantData.name,
+                            ic: dependantData.ic,
+                            birthday: this.formatDate(dependantData.birthday),
+                            age: dependantData.age,
+                            gender: dependantData.gender,
+                            relationship: dependantData.relationship,
+                            isHeir: dependantData.isHeir || false,
+                            heirEmail: dependantData.heirEmail || ''
+                        };
+                        console.log('Set dependant data:', this.dependant);
+                    },
+                    
+                    filteredDependants() {
+                        if (!this.search) return this.dependants;
+                        const searchTerm = this.search.toLowerCase();
+                        return this.dependants.filter(d => 
+                            d.name.toLowerCase().includes(searchTerm) || 
+                            d.ic.toLowerCase().includes(searchTerm)
+                        );
+                    }
+                }
+            }
+        </script>
+
+        <div class="main-content" style="padding-top: 6rem; min-height: calc(100vh - 6rem);">
+            <div class="flex flex-col items-center">
+                <div class="w-full bg-white p-6">
+                    <div class="text-xl font-semibold mb-4 text-center">Dependant List</div>
+                    <!-- Flash Messages -->
+                    <% if (messages && messages.error && messages.error.length > 0) { %>
+                        <div class="bg-red-100 border border-red-400 text-red-700 px-4 py-3 rounded relative mb-4" role="alert">
+                            <span class="block sm:inline"><%= messages.error[0] %></span>
+                        </div>
+                    <% } %>
+                    <% if (messages && messages.success && messages.success.length > 0) { %>
+                        <div class="bg-green-100 border border-green-400 text-green-700 px-4 py-3 rounded relative mb-4" role="alert">
+                            <span class="block sm:inline"><%= messages.success[0] %></span>
+                        </div>
+                    <% } %>
+                    <% if (messages && messages.info && messages.info.length > 0) { %>
+                        <div class="bg-blue-100 border border-blue-400 text-blue-700 px-4 py-3 rounded relative mb-4" role="alert">
+                            <span class="block sm:inline"><%= messages.info[0] %></span>
+                        </div>
+                    <% } %>
+
+                    <div class="text-xl font-semibold mb-4 text-center">
+                        <h1 class="text-2xl font-bold mb-2">Dependant Details</span></h1>
+                        <p class="text-lg text-gray-600">Member: <span x-text="memberName"></p>
+                        <p class="text-sm text-gray-500" x-text="'Total Dependants: ' + dependants.length"></p>
+                    </div>
+
+                    <div class="mb-4">
+                        <input type="text" 
+                            class="border border-gray-300 w-full p-2 rounded" 
+                            placeholder="Search by Name or IC Number" 
+                            x-model="search">
+                    </div>
+
+                    <div class="overflow-x-auto">
+                        <table class="w-full border-collapse border border-gray-300">
+                            <thead>
+                                <tr class="bg-gray-200">
+                                    <th class="border border-gray-300 px-4 py-2">#</th>
+                                    <th class="border border-gray-300 px-4 py-2">Name</th>
+                                    <th class="border border-gray-300 px-4 py-2">IC Number</th>
+                                    <th class="border border-gray-300 px-4 py-2">Birthday Date</th>
+                                    <th class="border border-gray-300 px-4 py-2">Age</th>
+                                    <th class="border border-gray-300 px-4 py-2">Gender</th>
+                                    <th class="border border-gray-300 px-4 py-2">Relationship</th>
+                                    <th class="border border-gray-300 px-4 py-2">Action</th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                                <template x-for="(dependant, index) in filteredDependants()" :key="dependant._id">
+                                    <tr>
+                                        <td class="border border-gray-300 px-4 py-2" x-text="index + 1"></td>
+                                        <td class="border border-gray-300 px-4 py-2" x-text="dependant.name"></td>
+                                        <td class="border border-gray-300 px-4 py-2" x-text="dependant.ic"></td>
+                                        <td class="border border-gray-300 px-4 py-2" x-text="formatDisplayDate(dependant.birthday)"></td>
+                                        <td class="border border-gray-300 px-4 py-2" x-text="dependant.age"></td>
+                                        <td class="border border-gray-300 px-4 py-2" x-text="dependant.gender"></td>
+                                        <td class="border border-gray-300 px-4 py-2" x-text="dependant.relationship"></td>
+                                        <td class="border border-gray-300 px-4 py-2 text-center">
+                                            <button @click="showModal = true; editDependantId = dependant._id" class="mr-2">
+                                                <img src="/assets/images/edit.png" class="w-5 h-5 inline">
+                                            </button>
+                                            <button @click="showDeleteModal = true; deleteDependantId = dependant._id">
+                                                <img src="/assets/images/delete.png" class="w-5 h-5 inline">
+                                            </button>
+                                        </td>
+                                    </tr>
+                                </template>
+                                <template x-if="filteredDependants().length === 0">
+                                    <tr>
+                                        <td colspan="8" class="text-center border border-gray-300 px-4 py-2">
+                                            No dependants found.
+                                        </td>
+                                    </tr>
+                                </template>
+                            </tbody>
+                        </table>
+                    </div>
+
+                    <div class="mt-6 flex justify-center">
+                        <button type="button" 
+                            class="w-32 bg-blue-500 text-white py-2 rounded-lg shadow-md hover:bg-blue-600 transition"
+                            @click="openAddModal">
+                            Add Dependant
+                        </button>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Add Dependant Modal -->
+        <div x-show="showModal && modalType === 'add'" 
+             x-cloak
+             class="fixed inset-0 flex items-center justify-center bg-black bg-opacity-50"
+             @click.away="showModal = false">
+            <div class="bg-white p-6 rounded-lg shadow-lg w-1/3" @click.stop>
+                <h2 class="text-xl font-semibold mb-4">Add Dependant</h2>
+
+                <form action="/memberdependant" method="POST">
+                    <input type="hidden" name="_csrf" value="<%= csrfToken %>">
+                    
+                    <div class="grid grid-cols-2 gap-4">
+                        <div>
+                            <label class="block text-sm font-medium text-gray-700">Full Name</label>
+                            <input type="text" name="name" class="w-full p-2 border rounded" x-model="dependant.name" required>
+                        </div>
+
+                        <div>
+                            <label class="block text-sm font-medium text-gray-700">IC Number</label>
+                            <input type="text" name="ic" class="w-full p-2 border rounded" x-model="dependant.ic" required>
+                        </div>
+
+                        <div>
+                            <label class="block text-sm font-medium text-gray-700">Birthday Date</label>
+                            <input type="date" name="birthday" class="w-full p-2 border rounded" 
+                                x-model="dependant.birthday" 
+                                @change="dependant.age = calculateAge(dependant.birthday)" required>
+                        </div>
+
+                        <div>
+                            <label class="block text-sm font-medium text-gray-700">Age</label>
+                            <input type="number" name="age" class="w-full p-2 border rounded bg-gray-50" 
+                                x-model="dependant.age" readonly>
+                        </div>
+
+                        <div>
+                            <label class="block text-sm font-medium text-gray-700">Gender</label>
+                            <select name="gender" class="w-full p-2 border rounded" x-model="dependant.gender" required>
+                                <option value="">Select gender</option>
+                                <option value="Male">Male</option>
+                                <option value="Female">Female</option>
+                            </select>
+                        </div>
+
+                        <div>
+                            <label class="block text-sm font-medium text-gray-700">Relationship</label>
+                            <select name="relationship" class="w-full p-2 border rounded" x-model="dependant.relationship" required>
+                                <option value="">Select relationship</option>
+                                <option value="Spouse">Spouse</option>
+                                <option value="Child">Child</option>
+                                <option value="Parent">Parent</option>
+                                <option value="Sibling">Sibling</option>
+                            </select>
+                        </div>
+
+                        <div class="col-span-2">
+                            <label class="inline-flex items-center">
+                                <input type="checkbox" name="isHeir" class="form-checkbox h-5 w-5 text-blue-600" x-model="dependant.isHeir">
+                                <span class="ml-2 text-sm text-gray-700">Set as Heir</span>
+                            </label>
+                        </div>
+
+                        <div x-show="dependant.isHeir" class="col-span-2">
+                            <label class="block text-sm font-medium text-gray-700">Heir Email</label>
+                            <input type="email" name="heirEmail" class="w-full p-2 border rounded" x-model="dependant.heirEmail" :required="dependant.isHeir">
+                        </div>
+                    </div>
+
+                    <div class="flex justify-end gap-2 mt-4">
+                        <button type="button" @click="showModal = false"
+                            class="bg-red-500 text-white px-4 py-2 rounded hover:bg-red-600 transition">Cancel</button>
+                        <button type="submit"
+                            class="bg-blue-500 text-white px-4 py-2 rounded hover:bg-blue-600 transition">Add</button>
+                    </div>
+                </form>
+            </div>
+        </div>
+
+        <!-- Edit Dependant Modal -->
+        <div x-show="showModal && modalType === 'edit'" 
+             x-cloak
+             class="fixed inset-0 flex items-center justify-center bg-black bg-opacity-50"
+             @click.away="showModal = false">
+            <div class="bg-white p-6 rounded-lg shadow-lg w-1/3" @click.stop>
+                <h2 class="text-xl font-semibold mb-4">Edit Dependant</h2>
+
+                <form x-bind:action="`/memberdependant/${dependant._id}/update`" method="POST">
+                    <input type="hidden" name="_csrf" value="<%= csrfToken %>">
+                    <input type="hidden" x-bind:value="dependant._id" name="dependantId">
+                    
+                    <div class="grid grid-cols-2 gap-4">
+                        <div>
+                            <label class="block text-sm font-medium text-gray-700">Full Name</label>
+                            <input type="text" name="name" x-model="dependant.name" class="w-full p-2 border rounded" required>
+                        </div>
+
+                        <div>
+                            <label class="block text-sm font-medium text-gray-700">IC Number</label>
+                            <input type="text" name="ic" x-model="dependant.ic" class="w-full p-2 border rounded" required>
+                        </div>
+
+                        <div>
+                            <label class="block text-sm font-medium text-gray-700">Birthday Date</label>
+                            <input type="date" name="birthday" x-model="dependant.birthday" 
+                                @change="dependant.age = calculateAge(dependant.birthday)" 
+                                class="w-full p-2 border rounded" required>
+                        </div>
+
+                        <div>
+                            <label class="block text-sm font-medium text-gray-700">Age</label>
+                            <input type="number" name="age" x-model="dependant.age" 
+                                class="w-full p-2 border rounded bg-gray-50" readonly>
+                        </div>
+
+                        <div>
+                            <label class="block text-sm font-medium text-gray-700">Gender</label>
+                            <select name="gender" x-model="dependant.gender" class="w-full p-2 border rounded" required>
+                                <option value="">Select gender</option>
+                                <option value="Male">Male</option>
+                                <option value="Female">Female</option>
+                            </select>
+                        </div>
+
+                        <div>
+                            <label class="block text-sm font-medium text-gray-700">Relationship</label>
+                            <select name="relationship" x-model="dependant.relationship" class="w-full p-2 border rounded" required>
+                                <option value="">Select relationship</option>
+                                <option value="Spouse">Spouse</option>
+                                <option value="Child">Child</option>
+                                <option value="Parent">Parent</option>
+                                <option value="Sibling">Sibling</option>
+                            </select>
+                        </div>
+
+                        <div class="col-span-2">
+                            <label class="inline-flex items-center">
+                                <input type="checkbox" name="isHeir" class="form-checkbox h-5 w-5 text-blue-600" x-model="dependant.isHeir">
+                                <span class="ml-2 text-sm text-gray-700">Set as Heir</span>
+                            </label>
+                        </div>
+
+                        <div x-show="dependant.isHeir" class="col-span-2">
+                            <label class="block text-sm font-medium text-gray-700">Heir Email</label>
+                            <input type="email" name="heirEmail" class="w-full p-2 border rounded" x-model="dependant.heirEmail" :required="dependant.isHeir">
+                        </div>
+                    </div>
+
+                    <div class="flex justify-end gap-2 mt-4">
+                        <button type="button" @click="showModal = false"
+                            class="bg-red-500 text-white px-4 py-2 rounded hover:bg-red-600 transition">Cancel</button>
+                        <button type="submit"
+                            class="bg-blue-500 text-white px-4 py-2 rounded hover:bg-blue-600 transition">Update</button>
+                    </div>
+                </form>
+            </div>
+        </div>
+
+        <!-- Delete Confirmation Modal -->
+        <div x-show="showDeleteModal" 
+             x-cloak
+             class="fixed inset-0 flex items-center justify-center bg-black bg-opacity-50"
+             @click.away="showDeleteModal = false">
+            <div class="bg-white p-6 rounded-lg shadow-lg w-1/3" @click.stop>
+                <h2 class="text-xl font-semibold mb-4">Delete Dependant</h2>
+                <p class="mb-4">Are you sure you want to delete this dependant? This action cannot be undone.</p>
+                <div class="flex justify-end">
+                    <button class="bg-gray-500 text-white px-4 py-2 rounded mr-2 hover:bg-gray-600 transition" @click="showDeleteModal = false">Cancel</button>
+                    <form :action="'/memberdependant/' + deleteDependantId + '/delete'" method="POST">
+                        <input type="hidden" name="_csrf" value="<%= csrfToken %>">
+                        <button type="submit" class="bg-red-500 text-white px-4 py-2 rounded hover:bg-red-600 transition">Delete</button>
+                    </form>
+                </div>
+            </div>
+        </div>
+    </div>
+</body>
+
+<%- include('include/footer') %>

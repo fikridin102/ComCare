@@ -1,0 +1,516 @@
+const Dependant = require("../models/dependant");
+const User = require("../models/user");
+const Payment = require('../models/payment');
+const bcrypt = require('bcrypt');
+
+
+exports.getMemberList = async (req, res) => {
+    try {
+        const members = await User.find({ userType: "member" })
+            .select('_id customId fullname username email icNum birthDate age phoneNum address status');
+        
+        console.log("Fetched Members:", members); // Debug log
+        
+        // Transform the data to ensure all required fields are present
+        const transformedMembers = members.map(member => ({
+            _id: member._id,
+            customId: member.customId,
+            fullname: member.fullname,
+            username: member.username,
+            email: member.email,
+            icNum: member.icNum,
+            birthDate: member.birthDate,
+            age: member.age,
+            phoneNum: member.phoneNum,
+            address: member.address,
+            status: member.status
+        }));
+        
+        console.log("Transformed Members:", transformedMembers); // Debug log
+        
+        res.render("adminMember", { 
+            members: transformedMembers,
+            membersJson: JSON.stringify(transformedMembers),
+            user: req.session.user
+        });
+    } catch (err) {
+        console.error("Error retrieving members:", err);
+        res.status(500).send({ message: "Error retrieving members" });
+    }
+};
+
+async function generateCustomId() {
+    const count = await User.countDocuments();
+    const nextId = count + 1;
+    return `CC${nextId.toString().padStart(2, '0')}`;
+}
+
+//ADD MEMBER 
+function calculateAge(birthDate) {
+    const today = new Date();
+    const birth = new Date(birthDate);
+    let age = today.getFullYear() - birth.getFullYear();
+    const m = today.getMonth() - birth.getMonth();
+    if (m < 0 || (m === 0 && today.getDate() < birth.getDate())) {
+        age--;
+    }
+    return age;
+}
+
+exports.addNewMember = async (req, res) => {
+    try {
+        const {
+            fullname,
+            username,
+            email,
+            icNum,
+            birthDate,
+            age,
+            address,
+            phoneNum,
+            password,
+            passwordConfirm
+        } = req.body;
+
+        // Validate passwords match
+        if (password !== passwordConfirm) {
+            req.flash("error", "Passwords do not match");
+            return res.redirect("/admindashboard");
+        }
+
+        // Check if user already exists
+        let user = await User.findOne({ email });
+        if (user) {
+            req.flash("error", "User already exists");
+            return res.redirect("/admindashboard");
+        }
+
+        // Hash password
+        const hashedPassword = await bcrypt.hash(password, 10);
+
+        // Find the latest user based on customId
+        const latestUser = await User.findOne({ customId: { $exists: true } }).sort({ customId: -1 });
+
+        let newCustomId = "CC01"; // Default if no user found
+
+        if (latestUser && latestUser.customId) {
+            const lastNumber = parseInt(latestUser.customId.slice(2)) || 0;
+            const nextNumber = lastNumber + 1;
+            newCustomId = "CC" + String(nextNumber).padStart(2, "0");
+        }
+
+        // Create new user with generated customId
+        user = new User({
+            customId: newCustomId,
+            fullname,
+            username,
+            email,
+            icNum,
+            birthDate,
+            age:calculateAge(birthDate),
+            address,
+            phoneNum,
+            password: hashedPassword,
+            userType: "member",
+            status: "Inactive"
+        });
+
+        await user.save();
+        console.log("Saved user with customId:", user.customId); // ✅ This should now log correctly
+
+        req.flash("success", "Member registered successfully !");
+        res.redirect("/adminmember");
+    } catch (error) {
+        console.error("Registration error:", error);
+        req.flash("error", "Server error. Please try again later.");
+        res.redirect("/adminmember");
+    }
+};
+
+
+exports.getMemberName = async (req, res) => {
+    try {
+        const members = await User.find({ userType: "member" }, "_id username fullname");
+        const dependantDocs = await Dependant.find();
+        
+        // Format dependants to include member data
+        const formattedDependants = dependantDocs.map(dependant => {
+            const dependantObj = dependant.toObject();
+            
+            // Find the member for this dependant
+            const member = members.find(m => m._id.toString() === dependantObj.memberId.toString());
+            if (member) {
+                dependantObj.memberName = member.fullname || member.username;
+            }
+            
+            return dependantObj;
+        });
+        
+        res.render("adminDependant", { 
+            members: members || [],
+            membersJson: JSON.stringify(members || []),
+            dependants: formattedDependants || [],
+            dependantsJson: JSON.stringify(formattedDependants || []),
+            user: req.session.user
+        });
+    } catch (err) {
+        console.error("Error fetching members:", err);
+        res.status(500).send("Server Error");
+    }
+};
+
+exports.editMember = async (req, res) => {
+    try {
+        const memberToEditId = req.params.id;
+
+        const {
+            fullname,
+            username,
+            email,
+            icNum,
+            birthDate,
+            phoneNum,
+            address,
+            status
+        } = req.body;
+
+        const age = new Date().getFullYear() - new Date(birthDate).getFullYear();
+
+        const updated = await User.findByIdAndUpdate(
+            memberToEditId,
+            {
+                fullname,
+                username,
+                email,
+                icNum,
+                birthDate,
+                phoneNum,
+                address,
+                age,
+                status
+            },
+            { new: true } // This option returns the updated document
+        );
+
+        if (!updated) {
+            req.flash("error", "Member not found");
+            return res.redirect("/adminmember");
+        }
+
+        req.flash("success", "Member updated successfully!");
+        res.redirect("/adminmember");
+    } catch (error) {
+        console.error("Error editing member:", error);
+        req.flash("error", "Error updating member. Please try again.");
+        res.redirect("/adminmember");
+    }
+};
+
+
+exports.deleteMember = async (req, res) => {
+    try {
+        const memberId = req.params.id;
+        await User.findByIdAndDelete(memberId);
+        req.flash("success", "Member deleted successfully!");
+        res.redirect('/adminmember');
+    } catch (error) {
+        console.error('Error deleting member:', error);
+        req.flash("error", "Error deleting member. Please try again.");
+        res.redirect('/adminmember');
+    }
+};
+
+exports.updateMemberStatus = async (req, res) => {
+    try {
+        const memberId = req.params.id;
+        const { status } = req.body;
+        
+        // Validate status
+        if (status !== 'Active' && status !== 'Inactive') {
+            req.flash("error", "Invalid status value");
+            return res.redirect('/adminmember');
+        }
+        
+        const updated = await User.findByIdAndUpdate(
+            memberId,
+            { status },
+            { new: true }
+        );
+        
+        if (!updated) {
+            req.flash("error", "Member not found");
+            return res.redirect('/adminmember');
+        }
+        
+        req.flash("success", `Member status updated to ${status}`);
+        res.redirect('/adminmember');
+    } catch (error) {
+        console.error('Error updating member status:', error);
+        req.flash("error", "Error updating member status. Please try again.");
+        res.redirect('/adminmember');
+    }
+};
+
+// Get all dependants for the logged-in member
+exports.getMemberDependants = async (req, res) => {
+    try {
+        console.log('=== Starting getMemberDependants ===');
+        
+        // Check if user is logged in
+        if (!req.session.user) {
+            console.log('No user in session');
+            req.flash("error", "Please login first");
+            return res.redirect("/login");
+        }
+
+        console.log('Session user:', JSON.stringify(req.session.user, null, 2));
+
+        // Get the current logged-in member's ID from the session
+        const memberId = req.session.user._id || req.session.user.id;
+        console.log('Member ID:', memberId);
+        
+        if (!memberId) {
+            console.log('No member ID found in session');
+            req.flash("error", "Invalid session");
+            return res.redirect("/login");
+        }
+        
+        // Find all dependants for this member
+        const dependants = await Dependant.find({ memberId }).lean();
+        
+        // Transform dates to ISO strings for proper JSON serialization
+        const transformedDependants = dependants.map(d => ({
+            ...d,
+            _id: d._id.toString(), // Convert ObjectId to string
+            birthday: d.birthday ? new Date(d.birthday).toISOString() : null,
+            memberId: d.memberId ? d.memberId.toString() : null // Add null check for memberId
+        }));
+        
+        console.log('Found dependants:', JSON.stringify(transformedDependants, null, 2));
+        
+        // Add flash messages if no dependants found
+        if (!dependants.length) {
+            req.flash('info', 'No dependants found. Add your first dependant using the button below.');
+        }
+        
+        // Prepare view data
+        const viewData = {
+            dependants: transformedDependants,
+            user: {
+                ...req.session.user,
+                _id: req.session.user.id.toString(), // Use id instead of _id
+                fullname: req.session.user.fullname || '',
+                username: req.session.user.username || ''
+            },
+            csrfToken: req.csrfToken(),
+            messages: {
+                success: req.flash('success'),
+                error: req.flash('error'),
+                info: req.flash('info')
+            }
+        };
+        
+        // Log the exact data being sent to the view
+        console.log('View data:', JSON.stringify(viewData, null, 2));
+        
+        // Render the page
+        console.log('Rendering memberDependant view...');
+        res.render("memberDependant", viewData);
+        console.log('=== Finished getMemberDependants ===');
+    } catch (err) {
+        console.error("Error fetching dependants:", err);
+        req.flash("error", "Error retrieving dependants");
+        res.redirect("/login");
+    }
+};
+
+// Add a new dependant for the logged-in member
+exports.addMemberDependant = async (req, res) => {
+    try {
+        const memberId = req.session.user._id || req.session.user.id;
+        const member = await User.findById(memberId);
+        if (!member) {
+            req.flash('error', 'Member not found.');
+            return res.redirect('/memberdependant');
+        }
+
+        const { name, ic, birthday, gender, relationship, isHeir, heirEmail } = req.body;
+
+        // Calculate age from birthday
+        const today = new Date();
+        const birth = new Date(birthday);
+        let age = today.getFullYear() - birth.getFullYear();
+        const m = today.getMonth() - birth.getMonth();
+        if (m < 0 || (m === 0 && today.getDate() < birth.getDate())) {
+            age--;
+        }
+
+        // Check if IC already exists for another dependant of the same member
+        const existingDependant = await Dependant.findOne({ ic, memberId });
+        if (existingDependant) {
+            req.flash('error', 'Dependant with this IC number already exists for this member.');
+            return res.redirect('/memberdependant');
+        }
+
+        // Handle heir logic
+        let newIsHeir = isHeir === 'on'; // Checkbox value is 'on' when checked
+        let newHeirEmail = newIsHeir ? heirEmail : undefined;
+
+        if (newIsHeir) {
+            if (!newHeirEmail || !/^[\w-]+(?:\.[\w-]+)*@(?:[\w-]+\.)+[a-zA-Z]{2,7}$/.test(newHeirEmail)) {
+                req.flash('error', 'Heir email is required and must be a valid email address.');
+                return res.redirect('/memberdependant');
+        }
+            // Unset previous heir for this member
+            await Dependant.updateMany(
+                { memberId, isHeir: true },
+                { $set: { isHeir: false, heirEmail: undefined } }
+            );
+        }
+
+        const newDependant = new Dependant({
+            name,
+            ic,
+            birthday,
+            age,
+            gender,
+            relationship,
+            memberId,
+            memberName: member.fullname,
+            isHeir: newIsHeir,
+            heirEmail: newHeirEmail
+        });
+
+        await newDependant.save();
+
+        req.flash('success', 'Dependant added successfully!');
+        res.redirect('/memberdependant');
+    } catch (error) {
+        console.error('Error adding dependant:', error);
+        req.flash('error', 'Error adding dependant. Please try again.');
+        res.redirect('/memberdependant');
+    }
+};
+
+// Update an existing dependant
+exports.updateMemberDependant = async (req, res) => {
+    try {
+        console.log('Update dependant request body:', req.body);
+        console.log('Update dependant params:', req.params);
+        console.log('Session user:', req.session.user);
+        
+        const memberId = req.session.user._id || req.session.user.id;
+        const dependantId = req.params.id;
+        
+        if (!dependantId) {
+            console.log('No dependant ID provided');
+            req.flash("error", "Invalid dependant ID");
+            return res.redirect("/memberdependant");
+        }
+
+        const {
+            name,
+            ic,
+            birthday,
+            gender,
+            relationship,
+            isHeir,
+            heirEmail
+        } = req.body;
+
+        // Validate required fields
+        if (!name || !ic || !birthday || !gender || !relationship) {
+            console.log('Missing required fields:', { name, ic, birthday, gender, relationship });
+            req.flash("error", "All fields are required");
+            return res.redirect("/memberdependant");
+        }
+
+        // Calculate age based on birthday
+        const birthDate = new Date(birthday);
+        const today = new Date();
+        let age = today.getFullYear() - birthDate.getFullYear();
+        const monthDiff = today.getMonth() - birthDate.getMonth();
+        
+        if (monthDiff < 0 || (monthDiff === 0 && today.getDate() < birthDate.getDate())) {
+            age--;
+        }
+
+        // Handle heir logic
+        let newIsHeir = isHeir === 'on'; // Checkbox value is 'on' when checked
+        let newHeirEmail = newIsHeir ? heirEmail : undefined;
+
+        if (newIsHeir) {
+            if (!newHeirEmail || !/^[\w-]+(?:\.[\w-]+)*@(?:[\w-]+\.)+[a-zA-Z]{2,7}$/.test(newHeirEmail)) {
+                req.flash('error', 'Heir email is required and must be a valid email address.');
+                return res.redirect('/memberdependant');
+            }
+            // Unset previous heir for this member, excluding the current dependant
+            await Dependant.updateMany(
+                { memberId, isHeir: true, _id: { $ne: dependantId } },
+                { $set: { isHeir: false, heirEmail: undefined } }
+            );
+        }
+
+        // Update the dependant
+        const updatedDependant = await Dependant.findOneAndUpdate(
+            { _id: dependantId, memberId },
+            {
+                name,
+                ic,
+                birthday,
+                age,
+                gender,
+                relationship,
+                isHeir: newIsHeir,
+                heirEmail: newHeirEmail
+            },
+            { new: true }
+        );
+
+        if (!updatedDependant) {
+            console.log('Dependant not found with ID:', dependantId);
+            req.flash("error", "Dependant not found");
+            return res.redirect("/memberdependant");
+        }
+
+        console.log('Dependant updated successfully:', updatedDependant);
+        req.flash("success", "Dependant updated successfully!");
+        res.redirect("/memberdependant");
+    } catch (error) {
+        console.error("Error updating dependant:", error);
+        if (error.code === 11000) {
+            req.flash("error", "IC number already exists");
+        } else {
+            req.flash("error", "Server error. Please try again later.");
+        }
+        res.redirect("/memberdependant");
+    }
+};
+
+// Delete a dependant
+exports.deleteMemberDependant = async (req, res) => {
+    try {
+        console.log('Delete dependant request params:', req.params);
+        console.log('Session user:', req.session.user);
+        
+        const memberId = req.session.user._id || req.session.user.id;
+        const dependantId = req.params.id;
+        
+        // Find and delete the dependant
+        const deletedDependant = await Dependant.findOneAndDelete({ _id: dependantId, memberId });
+        
+        if (!deletedDependant) {
+            console.log('Dependant not found with ID:', dependantId);
+            req.flash("error", "Dependant not found");
+            return res.redirect("/memberdependant");
+        }
+        
+        console.log('Dependant deleted successfully:', deletedDependant);
+        req.flash("success", "Dependant deleted successfully!");
+        res.redirect("/memberdependant");
+    } catch (error) {
+        console.error("Error deleting dependant:", error);
+        req.flash("error", "Server error. Please try again later.");
+        res.redirect("/memberdependant");
+    }
+};

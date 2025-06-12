@@ -1,0 +1,130 @@
+const User = require("../models/user");
+const bcrypt = require("bcryptjs");
+const { calculateAge } = require("../utils/dateUtils");
+
+exports.registerUser = async (req, res) => {
+    try {
+        const {
+            fullname,
+            username,
+            email,
+            icNum,
+            birthDate,
+            age,
+            address,
+            phoneNum,
+            password,
+            passwordConfirm
+        } = req.body;
+
+        // Validate passwords match
+        if (password !== passwordConfirm) {
+            req.flash("error", "Passwords do not match");
+            return res.redirect("/register");
+        }
+
+        // Check if user already exists
+        let user = await User.findOne({ email });
+        if (user) {
+            req.flash("error", "User already exists");
+            return res.redirect("/register");
+        }
+
+        // Hash password
+        const hashedPassword = await bcrypt.hash(password, 10);
+
+        // Find the latest user based on customId
+        const latestUser = await User.findOne({ customId: { $exists: true } }).sort({ customId: -1 });
+
+        let newCustomId = "CC01"; // Default if no user found
+
+        if (latestUser && latestUser.customId) {
+            const lastNumber = parseInt(latestUser.customId.slice(2)) || 0;
+            const nextNumber = lastNumber + 1;
+            newCustomId = "CC" + String(nextNumber).padStart(2, "0");
+        }
+
+        // Create new user with generated customId
+        user = new User({
+            customId: newCustomId,
+            fullname,
+            username,
+            email,
+            icNum,
+            birthDate,
+            age:calculateAge(birthDate),
+            address,
+            phoneNum,
+            password: hashedPassword,
+            userType: "member",
+            status: "Inactive"
+        });
+
+        await user.save();
+        console.log("Saved user with customId:", user.customId); // ✅ This should now log correctly
+
+        req.flash("success", "Registration successful! Please log in.");
+        res.redirect("/login");
+    } catch (error) {
+        console.error("Registration error:", error);
+        req.flash("error", "Server error. Please try again later.");
+        res.redirect("/register");
+    }
+};
+
+exports.loginUser = async (req, res) => {
+    try {
+        const { username, password } = req.body;
+
+        const user = await User.findOne({ username });
+        if (!user) {
+            req.flash("error", "Invalid username or password");
+            return res.redirect("/login");
+        }
+
+        const isMatch = await bcrypt.compare(password, user.password);
+        if (!isMatch) {
+            req.flash("error", "Invalid username or password");
+            return res.redirect("/login");
+        }
+
+        // Check if user is active
+        if (user.status !== "Active") {
+            req.flash("error", "Your account is not active. Please contact the administrator.");
+            return res.redirect("/login");
+        }
+
+        // Create session
+        req.session.user = {
+            id: user._id,
+            username: user.username,
+            userType: user.userType,
+            fullname: user.fullname,
+            ic: user.icNum
+        };
+
+        // Redirect based on user type
+        if (user.userType === "admin") {
+            req.flash("success", "Welcome back, Admin!");
+            res.redirect("/admindashboard");
+        } else {
+            req.flash("success", "Welcome back, " + user.fullname + "!");
+            res.redirect("/memberIndex");
+        }
+    } catch (error) {
+        console.error("Login error:", error);
+        req.flash("error", "Server error. Please try again later.");
+        res.redirect("/login");
+    }
+};
+
+exports.logoutUser = (req, res) => {
+    req.session.destroy((err) => {
+        if (err) {
+            console.error("Logout error:", err);
+            req.flash("error", "Error logging out. Please try again.");
+            return res.redirect("/dashboard");
+        }
+        res.redirect("/login");
+    });
+};

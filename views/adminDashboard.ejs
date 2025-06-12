@@ -1,0 +1,39 @@
+<%- include('include/header') %>
+<%- include('include/adminnavbar') %>
+
+<body class="bg-gray-100">
+    <div class="main-content" style="padding-top: 6rem; min-height: calc(100vh - 6rem);">
+        <div class="flex flex-col items-center">
+            <div class="w-full bg-white p-6">
+                <div class="text-2xl font-bold mb-8 text-center">Admin Dashboard</div>
+                <div class="grid grid-cols-1 md:grid-cols-4 gap-6 mb-8">
+                    <div class="bg-blue-100 p-6 rounded shadow text-center">
+                        <div class="text-3xl font-bold"><%= totalMembers %></div>
+                        <div class="text-gray-700 mt-2">Members</div>
+                    </div>
+                    <div class="bg-green-100 p-6 rounded shadow text-center">
+                        <div class="text-3xl font-bold"><%= totalDependants %></div>
+                        <div class="text-gray-700 mt-2">Dependants</div>
+                    </div>
+                    <div class="bg-yellow-100 p-6 rounded shadow text-center">
+                        <div class="text-3xl font-bold"><%= totalPayments %></div>
+                        <div class="text-gray-700 mt-2">Payments</div>
+                    </div>
+                    <div class="bg-purple-100 p-6 rounded shadow text-center">
+                        <div class="text-3xl font-bold"><%= totalClaims %></div>
+                        <div class="text-gray-700 mt-2">Claims</div>
+                    </div>
+                </div>
+                <div class="flex flex-wrap justify-center gap-4">
+                    <a href="/adminmember" class="bg-blue-500 hover:bg-blue-600 text-white px-6 py-3 rounded shadow transition">Manage Members</a>
+                    <a href="/admin/dependants" class="bg-green-500 hover:bg-green-600 text-white px-6 py-3 rounded shadow transition">Manage Dependants</a>
+                    <a href="/adminpayment" class="bg-yellow-500 hover:bg-yellow-600 text-white px-6 py-3 rounded shadow transition">View Payments</a>
+                    <a href="/adminclaim" class="bg-purple-500 hover:bg-purple-600 text-white px-6 py-3 rounded shadow transition">View Claims</a>
+                    <a href="/adminevent" class="bg-pink-500 hover:bg-pink-600 text-white px-6 py-3 rounded shadow transition">Manage Events</a>
+                    <a href="/adminannouncement" class="bg-indigo-500 hover:bg-indigo-600 text-white px-6 py-3 rounded shadow transition">Manage Announcements</a>
+                </div>
+                <%- include('include/footer') %>
+            </div>
+        </div>
+    </div>
+</body>

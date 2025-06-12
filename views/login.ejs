@@ -1,0 +1,54 @@
+<%- include('include/header') %>
+<body class="flex justify-center items-center h-screen bg-cover bg-center" style="background-image: url('/assets/images/background.jpg');">
+
+
+    <div class="w-96 bg-white shadow-lg rounded-lg p-6">
+        <div class="text-xl font-semibold mb-4 text-center">Login</div>
+        <div class="flex justify-center mb-4">
+            <img src="assets/images/logo.jpg" class="w-40 h-20">
+        </div>
+
+        <% if (typeof messages !== 'undefined' && messages.error && messages.error.length > 0) { %>
+            <div class="text-red-500 text-sm text-center mb-3"><%= messages.error[0] %></div>
+        <% } %>
+        <% if (typeof messages !== 'undefined' && messages.success && messages.success.length > 0) { %>
+            <div class="text-green-500 text-sm text-center mb-3"><%= messages.success[0] %></div>
+        <% } %>
+
+        <form action="/login" method="POST">
+            <% if (csrfToken) { %>
+                <input type="hidden" name="_csrf" value="<%= csrfToken %>">
+            <% } %>
+
+            <div class="mb-3">
+                <label for="username" class="block text-sm font-medium">Username</label>
+                <input 
+                    type="text" 
+                    id="username" 
+                    name="username" 
+                    class="w-full mt-1 p-2 border border-gray-300 rounded" 
+                    required 
+                    value="<%= typeof username !== 'undefined' ? username : '' %>">
+            </div>
+            
+            <div class="mb-3">
+                <label for="password" class="block text-sm font-medium">Password</label>
+                <input 
+                    type="password" 
+                    id="password" 
+                    name="password" 
+                    class="w-full mt-1 p-2 border border-gray-300 rounded" 
+                    required>
+            </div>
+
+            <button type="submit" class="w-full bg-blue-500 text-white py-2 rounded">Login</button>
+        </form>
+
+        <p class="text-sm text-center mt-3">
+            Don't have an account? 
+            <a href="/register" class="text-blue-500 hover:underline">Register</a>
+        </p>
+    </div>
+
+</body>
+<%- include('include/footer') %>

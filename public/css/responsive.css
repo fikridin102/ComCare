@@ -1,0 +1,93 @@
+/* Responsive container styles */
+.main-container {
+  transition: margin-left 0.3s ease;
+  width: 100%;
+  padding: 20px;
+}
+
+.main-container.expanded {
+  margin-left: 0;
+}
+
+.main-container.collapsed {
+  margin-left: 0;
+}
+
+/* Main Content */
+.main-content {
+    margin-left: 16rem; /* 256px */
+    padding: 1.5rem;
+    margin-top: 8rem; /* Increased to 8rem (128px) for more space below navbar */
+    min-height: calc(100vh - 8rem);
+    transition: margin-left 0.3s ease;
+    background-color: #f3f4f6;
+}
+
+.main-content > .flex > .w-full {
+    box-shadow: none !important;
+    border-radius: 0 !important;
+}
+
+/* When sidebar is collapsed */
+.sidebar.collapsed ~ .main-content {
+    margin-left: 4rem; /* 64px */
+}
+
+/* Responsive adjustments */
+@media (max-width: 1024px) {
+    .main-content {
+        margin-left: 4rem;
+    }
+}
+
+@media (max-width: 768px) {
+    .main-content {
+        margin-left: 0;
+        padding: 1rem;
+        margin-top: 7rem; /* Increased for mobile as well */
+    }
+}
+
+/* Responsive table styles */
+@media (max-width: 768px) {
+  .overflow-x-auto {
+    overflow-x: auto;
+    -webkit-overflow-scrolling: touch;
+  }
+  
+  table {
+    min-width: 800px; /* Ensure table doesn't get too small */
+  }
+}
+
+/* Responsive modal styles */
+@media (max-width: 640px) {
+  .modal-dialog {
+    margin: 0.5rem;
+    max-width: calc(100% - 1rem);
+  }
+}
+
+/* Responsive form styles */
+@media (max-width: 640px) {
+  .grid {
+    grid-template-columns: 1fr !important;
+  }
+  
+  .col-span-2 {
+    grid-column: 1 !important;
+  }
+}
+
+/* Responsive button styles */
+@media (max-width: 640px) {
+  .flex.justify-center.gap-6 {
+    flex-direction: column;
+    gap: 1rem;
+  }
+  
+  .flex.justify-center.gap-6 a {
+    width: 100%;
+    text-align: center;
+  }
+} 

@@ -1,0 +1,146 @@
+<style>
+    /* Full height sidebar */
+    .sidebar {
+              width: 250px;
+              height: 100vh;
+              position: fixed;
+              background-color: #343a40;
+              padding: 15px;
+              color: white;
+              display: flex;
+              flex-direction: column;
+              justify-content: space-between;
+              transition: transform 0.3s ease;
+              z-index: 1000;
+          }
+          .sidebar.collapsed {
+              transform: translateX(-250px);
+          }
+          .sidebar a {
+              color: white;
+              text-decoration: none;
+              display: block;
+              padding: 10px;
+              border-radius: 5px;
+          }
+          .sidebar a:hover {
+              background: #495057;
+          }
+  
+          .top-navbar {
+              position: fixed;
+              top: 0;
+              left: 250px;
+              width: calc(100% - 250px);
+              background: #0059b8b4;
+              color: white;
+              padding: 10px 20px;
+              display: flex;
+              justify-content: space-between;
+              align-items: center;
+              z-index: 999;
+              transition: all 0.3s ease;
+          }
+          .top-navbar.expanded {
+              left: 0;
+              width: 100%;
+          }
+  
+          .main-content {
+              margin-left: 250px;
+              transition: margin-left 0.3s ease;
+              padding: 20px;
+          }
+          .main-content.expanded {
+              margin-left: 0;
+          }
+  </style>
+  
+  <div class="sidebar">
+    <div>
+        <h4 class="text-center"><img src="/assets/images/logo.jpg" class="w-40 h-20"></h4>
+        <hr>
+        <ul class="nav flex-column">
+            <li class="nav-item">
+                <a href="/admindashboard" class="nav-link text-white">Dashboard</a>
+            </li>
+            <li class="nav-item">
+                <a href="/adminmember" class="nav-link text-white">Member</a>
+            </li>
+            <li class="nav-item">
+                <a href="/admindependant" class="nav-link text-white">Dependant</a>
+            </li>
+            <li class="nav-item">
+                <a href="/adminpayment" class="nav-link text-white">Payment</a>
+            </li>
+            <li class="nav-item">
+                <a href="/adminevent" class="nav-link text-white">Event</a>
+            </li>
+            <li class="nav-item">
+                <a href="/adminannouncement" class="nav-link text-white">Announcement</a>
+            </li>
+            <li class="nav-item">
+                <a href="/adminclaim" class="nav-link text-white">Khairat Claim</a>
+            </li>
+        </ul>
+    </div>
+  
+    
+  </div>
+  
+  <div class="top-navbar">
+    <!-- Toggle Button -->
+    <button id="sidebarToggle" class="btn btn-light me-2">
+      <i class="fas fa-bars"></i>
+    </button>
+    <!-- User Dropdown -->
+    <div class="dropdown ms-auto">
+        <a href="#" class="d-flex align-items-center text-white text-decoration-none dropdown-toggle" id="dropdownUser1"
+            data-bs-toggle="dropdown" aria-expanded="false">
+            <img src="<%= user && user.profilePicture ? user.profilePicture : '/assets/images/user.png' %>" 
+                 alt="Profile" width="32" height="32" class="rounded-circle me-2">
+            <strong><%= user && user.username ? user.username : (user && user.fullname ? user.fullname : 'Admin') %></strong>
+        </a>
+        <ul class="dropdown-menu dropdown-menu-dark text-small shadow" aria-labelledby="dropdownUser1">
+            <li><a class="dropdown-item" href="/adminprofile">Profile</a></li>
+            <li><hr class="dropdown-divider"></li>
+            <li><a class="dropdown-item" href="/logout">Sign out</a></li>
+        </ul>
+    </div>
+    <!-- <button class="btn btn-light">Logout</button> -->
+  </div>
+  <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/js/bootstrap.bundle.min.js"></script>
+  <script>
+  document.addEventListener('DOMContentLoaded', function() {
+    const sidebar = document.querySelector('.sidebar');
+    const topNavbar = document.querySelector('.top-navbar');
+    const mainContent = document.querySelector('.main-content');
+    const toggleBtn = document.getElementById('sidebarToggle');
+    
+    // Check localStorage for saved state
+    const isSidebarCollapsed = localStorage.getItem('adminSidebarCollapsed') === 'true';
+    
+    // Apply initial state
+    if (isSidebarCollapsed) {
+      sidebar.classList.add('collapsed');
+      topNavbar.classList.add('expanded');
+      if (mainContent) {
+        mainContent.classList.add('expanded');
+      }
+    }
+    
+    // Toggle sidebar
+    toggleBtn.addEventListener('click', function() {
+      sidebar.classList.toggle('collapsed');
+      topNavbar.classList.toggle('expanded');
+      if (mainContent) {
+        mainContent.classList.toggle('expanded');
+      }
+      
+      // Save state
+      const isCollapsed = sidebar.classList.contains('collapsed');
+      localStorage.setItem('adminSidebarCollapsed', isCollapsed);
+    });
+  });
+  </script>
+  

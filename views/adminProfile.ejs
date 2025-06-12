@@ -1,0 +1,80 @@
+<%- include('include/header') %>
+<%- include('include/adminnavbar') %>
+
+<body class="bg-gray-100 min-h-screen overflow-hidden" x-data="{
+    showEditModal: false, 
+    user: { 
+        customId: '<%= user.customId || "" %>',
+        username: '<%= user.username || "" %>',
+        fullname: '<%= user.fullname || "" %>',
+        email: '<%= user.email || "" %>',
+        icNum: '<%= user.icNum || "" %>',
+        birthDate: '<%= user.birthDate ? new Date(user.birthDate).toISOString().split("T")[0] : "" %>',
+        age: '<%= user.age || "" %>',
+        address: '<%= user.address || "" %>',
+        phoneNum: '<%= user.phoneNum || "" %>',
+        userType: '<%= user.userType || "" %>',
+        status: '<%= user.status || "" %>',
+        registeredDate: '<%= user.createdAt ? new Date(user.createdAt).toISOString().split("T")[0] : "" %>',
+        profilePhoto: '<%= user.profilePicture || "/assets/images/user.png" %>'
+    }
+}">
+    <div class="ml-64 mt-16 p-6 h-screen overflow-hidden">
+        <div class="flex flex-col items-center">
+            <div class="w-3/4 bg-white shadow-lg rounded-lg p-6">
+                <div class="text-xl font-semibold mb-4 text-center">Admin Profile</div>
+                <div class="flex justify-center mb-4">
+                    <img :src="user.profilePhoto" class="w-20 h-20 rounded-full shadow">
+                </div>
+                
+                <div class="overflow-x-auto">
+                    <table class="w-full border-collapse border border-gray-300">
+                        <tbody>
+                            <template x-for="(value, key) in user" :key="key" x-if="key !== 'profilePhoto'">
+                                <tr>
+                                    <td class="border border-gray-300 px-4 py-2 w-1/3 font-semibold" x-text="key.replace(/([A-Z])/g, ' $1').replace(/^./, str => str.toUpperCase())"></td>
+                                    <td class="border border-gray-300 px-4 py-2 w-2/3" x-text="value"></td>
+                                </tr>
+                            </template>
+                        </tbody>
+                    </table>
+                </div>
+
+                <div class="mt-4 flex justify-center">
+                    <button type="button" class="w-20 bg-blue-500 text-white py-2 rounded hover:bg-blue-600 transition" @click="showEditModal = true">Update</button>
+                </div>
+            </div>
+        </div>
+
+        <!-- Edit Modal -->
+        <template x-if="showEditModal">
+            <div class="fixed inset-0 flex items-center justify-center bg-black bg-opacity-50">
+                <div class="bg-white p-4 rounded-lg shadow-lg w-1/3 mx-auto">
+                    <h2 class="text-lg font-semibold mb-4 text-center">Edit Profile</h2>
+                    <form action="/update-profile" method="POST" enctype="multipart/form-data">
+                        <input type="hidden" name="_csrf" value="<%= csrfToken %>">
+                        <div class="grid grid-cols-2 gap-3">
+                            <div class="col-span-2 flex flex-col items-center">
+                                <img :src="user.profilePhoto" class="w-16 h-16 rounded-full mb-2 shadow">
+                            </div>
+                            <template x-for="(value, key) in user" :key="key" 
+                                x-if="key !== 'registeredDate' && key !== 'profilePhoto' && key !== 'customId' && key !== 'username' && key !== 'userType' && key !== 'status'">
+                                <div class="col-span-1">
+                                    <label class="block text-sm font-medium" x-text="key.replace(/([A-Z])/g, ' $1').replace(/^./, str => str.toUpperCase())"></label>
+                                    <input type="text" :name="key" class="border border-gray-300 w-full p-1 rounded mb-2 text-sm" x-model="user[key]">
+                                </div>
+                            </template>
+                        </div>
+                        
+                        <div class="flex justify-end mt-4">
+                            <button type="button" class="bg-red-500 text-white px-3 py-1 rounded mr-2 hover:bg-red-600 transition text-sm" @click="showEditModal = false">Cancel</button>
+                            <button type="submit" class="bg-green-500 text-white px-3 py-1 rounded hover:bg-green-600 transition text-sm">Save</button>
+                        </div>
+                    </form>
+                </div>
+            </div>
+        </template>
+    </div>
+</body>
+
+<%- include('include/footer') %>

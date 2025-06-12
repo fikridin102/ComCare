@@ -1,0 +1,613 @@
+<%- include('include/header') %>
+<%- include('include/navbar') %>
+
+<body class="bg-gray-100">
+    <div class="main-content" style="padding-top: 6rem; min-height: calc(100vh - 6rem);">
+    <div class="flex flex-col items-center">
+            <div class="w-full bg-white p-6">
+                <div class="text-xl font-semibold mb-4 text-center">Payment</div>
+        
+        <% if (messages && messages.error && messages.error.length > 0) { %>
+            <div class="alert alert-danger"><%= messages.error[0] %></div>
+        <% } %>
+        
+        <% if (messages && messages.success && messages.success.length > 0) { %>
+            <div class="alert alert-success"><%= messages.success[0] %></div>
+        <% } %>
+
+        <!-- Payment Form -->
+        <div class="card mb-4 shadow-sm">
+            <div class="card-header bg-primary text-white py-3">
+                <h4 class="mb-0">Make New Payment</h4>
+            </div>
+            <div class="card-body">
+                <div class="row">
+                    <div class="col-md-6">
+                        <div class="mb-4">
+                            <h5>Payment Summary</h5>
+                            <div id="khairatFeeSection">
+                                <div class="d-flex justify-content-between mb-2" id="memberFeeSection">
+                                    <span>Member Fee:</span>
+                                    <span id="memberFeeAmount">RM0.00</span>
+                                </div>
+                                <div class="d-flex justify-content-between mb-2">
+                                    <span>Dependants Fee (<span id="selectedDependantsCount">0</span> x RM30):</span>
+                                    <span id="dependantsFeeAmount">RM0.00</span>
+                                </div>
+                            </div>
+                            <div id="maintenanceFeeSection" style="display: none;">
+                                <div class="d-flex justify-content-between mb-2">
+                                    <span>Maintenance Fee:</span>
+                                    <span>RM400.00</span>
+                                </div>
+                            </div>
+                            <hr>
+                            <div class="d-flex justify-content-between fw-bold">
+                                <span>Total Amount:</span>
+                                <span id="totalAmount">RM0.00</span>
+                            </div>
+                        </div>
+                    </div>
+                    <div class="col-md-6">
+                        <form id="payment-form">
+                            <input type="hidden" name="_csrf" value="<%= csrfToken %>">
+                            <div class="mb-3">
+                                <label class="form-label">Payment Type</label>
+                                <select class="form-select" name="paymentType" id="paymentType" required onchange="updatePaymentSummary()">
+                                    <option value="">Select payment type</option>
+                                    <option value="khairat">Khairat Fee</option>
+                                    <option value="maintenance">Maintenance Fee</option>
+                                </select>
+                            </div>
+
+                            <div id="nameSelectionSection" style="display: none;" class="mb-3">
+                                <label class="form-label">Select Names for Khairat Payment</label>
+                                <div class="border rounded p-3">
+                                    <div class="form-check mb-2">
+                                        <input class="form-check-input name-checkbox" type="checkbox" value="<%= user._id || user.id %>" id="memberCheckbox" data-name="<%= user.fullname %>" data-type="member" checked>
+                                        <label class="form-check-label" for="memberCheckbox">
+                                            <%= user.fullname %> (Member)
+                                        </label>
+                                    </div>
+                                    <% if (dependants && dependants.length > 0) { %>
+                                        <% dependants.forEach(dependant => { %>
+                                            <div class="form-check mb-2">
+                                                <input class="form-check-input name-checkbox" type="checkbox" value="<%= dependant._id %>" id="dependant<%= dependant._id %>" data-name="<%= dependant.name %>" data-type="dependant">
+                                                <label class="form-check-label" for="dependant<%= dependant._id %>">
+                                                    <%= dependant.name %> (Dependant)
+                                                </label>
+                                            </div>
+                                        <% }); %>
+                                    <% } %>
+                                </div>
+                            </div>
+
+                            <div class="mb-3">
+                                <label class="form-label">Payment Method</label>
+                                <select class="form-select" name="paymentMethod" id="paymentMethod" required>
+                                    <option value="">Select payment method</option>
+                                    <option value="FPX">Online Banking (FPX)</option>
+                                    <option value="Credit Card">Credit Card</option>
+                                </select>
+                            </div>
+                            <div id="fpxSection" style="display: none;">
+                                <div class="mb-3">
+                                    <label class="form-label">Select Your Bank</label>
+                                    <div id="fpx-element" class="form-control"></div>
+                                    <div id="fpx-errors" class="text-danger mt-2" role="alert"></div>
+                                </div>
+                            </div>
+                            <div id="creditCardSection" style="display: none;">
+                                <div class="mb-3">
+                                    <label class="form-label">Card Information</label>
+                                    <div id="card-element" class="form-control"></div>
+                                    <div id="card-errors" class="text-danger mt-2" role="alert"></div>
+                                </div>
+                            </div>
+                            <button type="submit" class="btn btn-primary w-100" id="submit-button">Submit Payment</button>
+                        </form>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <script src="https://js.stripe.com/v3/"></script>
+        <script>
+            // Initialize Stripe with the publishable key
+            const stripe = Stripe('<%= process.env.STRIPE_PUBLISHABLE_KEY %>');
+            const elements = stripe.elements();
+            
+            // Create card element with custom styling
+            const card = elements.create('card', {
+                style: {
+                    base: {
+                        fontSize: '16px',
+                        color: '#32325d',
+                        fontFamily: '"Helvetica Neue", Helvetica, sans-serif',
+                        fontSmoothing: 'antialiased',
+                        '::placeholder': {
+                            color: '#aab7c4'
+                        }
+                    },
+                    invalid: {
+                        color: '#fa755a',
+                        iconColor: '#fa755a'
+                    }
+                }
+            });
+            
+            // Create FPX element
+            const fpx = elements.create('fpxBank', {
+                style: {
+                    base: {
+                        fontSize: '16px',
+                        color: '#32325d',
+                        fontFamily: '"Helvetica Neue", Helvetica, sans-serif',
+                        fontSmoothing: 'antialiased',
+                        '::placeholder': {
+                            color: '#aab7c4'
+                        }
+                    },
+                    invalid: {
+                        color: '#fa755a',
+                        iconColor: '#fa755a'
+                    }
+                },
+                accountHolderType: 'individual'
+            });
+            
+            // Mount the elements
+            card.mount('#card-element');
+            fpx.mount('#fpx-element');
+
+            // Handle real-time validation errors from the card Element
+            card.addEventListener('change', function(event) {
+                const displayError = document.getElementById('card-errors');
+                if (event.error) {
+                    displayError.textContent = event.error.message;
+                } else {
+                    displayError.textContent = '';
+                }
+            });
+
+            // Handle FPX validation errors
+            fpx.addEventListener('change', function(event) {
+                const displayError = document.getElementById('fpx-errors');
+                if (event.error) {
+                    displayError.textContent = event.error.message;
+                } else {
+                    displayError.textContent = '';
+                }
+            });
+
+            // Handle payment method selection
+            document.getElementById('paymentMethod').addEventListener('change', function(e) {
+                const fpxSection = document.getElementById('fpxSection');
+                const creditCardSection = document.getElementById('creditCardSection');
+                
+                fpxSection.style.display = 'none';
+                creditCardSection.style.display = 'none';
+                
+                if (e.target.value === 'FPX') {
+                    fpxSection.style.display = 'block';
+                } else if (e.target.value === 'Credit Card') {
+                    creditCardSection.style.display = 'block';
+                }
+            });
+
+            function updatePaymentSummary() {
+                const paymentType = document.getElementById('paymentType').value;
+                const khairatSection = document.getElementById('khairatFeeSection');
+                const maintenanceSection = document.getElementById('maintenanceFeeSection');
+                const nameSelectionSection = document.getElementById('nameSelectionSection');
+                const totalAmountElement = document.getElementById('totalAmount');
+                const selectedDependantsCount = document.getElementById('selectedDependantsCount');
+                const dependantsFeeAmount = document.getElementById('dependantsFeeAmount');
+                const memberFeeAmount = document.getElementById('memberFeeAmount');
+                const selectedNames = document.querySelectorAll('.name-checkbox:checked');
+                const feePerPerson = 30;
+
+                if (paymentType === 'khairat') {
+                    khairatSection.style.display = 'block';
+                    maintenanceSection.style.display = 'none';
+                    nameSelectionSection.style.display = 'block';
+                    
+                    // Check if member is selected
+                    const memberCheckbox = document.getElementById('memberCheckbox');
+                    const isMemberSelected = memberCheckbox.checked;
+                    
+                    // Update member fee
+                    memberFeeAmount.textContent = isMemberSelected ? 'RM30.00' : 'RM0.00';
+                    
+                    // Count selected dependants
+                    const selectedDependants = Array.from(selectedNames).filter(checkbox => checkbox.dataset.type === 'dependant');
+                    const dependantsCount = selectedDependants.length;
+                    
+                    // Update dependants count and fee
+                    selectedDependantsCount.textContent = dependantsCount;
+                    dependantsFeeAmount.textContent = 'RM' + (dependantsCount * feePerPerson).toFixed(2);
+                    
+                    // Calculate total amount
+                    const totalAmount = selectedNames.length * feePerPerson;
+                    totalAmountElement.textContent = 'RM' + totalAmount.toFixed(2);
+                } else if (paymentType === 'maintenance') {
+                    khairatSection.style.display = 'none';
+                    maintenanceSection.style.display = 'block';
+                    nameSelectionSection.style.display = 'none';
+                    totalAmountElement.textContent = 'RM400.00';
+                } else {
+                    khairatSection.style.display = 'none';
+                    maintenanceSection.style.display = 'none';
+                    nameSelectionSection.style.display = 'none';
+                    totalAmountElement.textContent = 'RM0.00';
+                }
+            }
+
+            // Add event listener for name checkboxes
+            document.addEventListener('change', function(e) {
+                if (e.target.classList.contains('name-checkbox')) {
+                    updatePaymentSummary();
+                }
+            });
+
+            // Handle form submission
+            const form = document.getElementById('payment-form');
+            form.addEventListener('submit', async function(event) {
+                event.preventDefault();
+                const submitButton = document.getElementById('submit-button');
+                submitButton.disabled = true;
+
+                const paymentType = document.getElementById('paymentType').value;
+                const paymentMethod = document.getElementById('paymentMethod').value;
+                const totalAmount = parseFloat(document.getElementById('totalAmount').textContent.replace('RM', ''));
+
+                // Validation messages
+                const validationMessages = [];
+
+                if (!paymentType) {
+                    validationMessages.push('Please select a payment type');
+                }
+
+                if (!paymentMethod) {
+                    validationMessages.push('Please select a payment method');
+                }
+
+                // Validate name selection for Khairat payment
+                if (paymentType === 'khairat') {
+                    const selectedNames = document.querySelectorAll('.name-checkbox:checked');
+                    if (selectedNames.length === 0) {
+                        validationMessages.push('Please select at least one name for Khairat payment');
+                    }
+                }
+
+                // Show validation messages if any
+                if (validationMessages.length > 0) {
+                    alert(validationMessages.join('\n'));
+                    submitButton.disabled = false;
+                    return;
+                }
+
+                // Get selected names for Khairat payment
+                const selectedNames = Array.from(document.querySelectorAll('.name-checkbox:checked')).map(checkbox => ({
+                    id: checkbox.value,
+                    name: checkbox.dataset.name,
+                    type: checkbox.dataset.type
+                }));
+
+                try {
+                    // Create payment intent
+                    const response = await fetch('/create-payment-intent', {
+                        method: 'POST',
+                        headers: {
+                            'Content-Type': 'application/json',
+                            'CSRF-Token': '<%= csrfToken %>'
+                        },
+                        body: JSON.stringify({
+                            amount: totalAmount,
+                            paymentType: paymentType,
+                            paymentMethod: paymentMethod,
+                            selectedNames: selectedNames
+                        })
+                    });
+
+                    if (!response.ok) {
+                        const errorData = await response.json();
+                        throw new Error(errorData.error || 'Failed to create payment intent');
+                    }
+
+                    const data = await response.json();
+                    console.log('Payment intent created:', data);
+
+                    let result;
+                    if (paymentMethod === 'Credit Card') {
+                        // Validate card details before proceeding
+                        const { error: cardError } = await stripe.createToken(card);
+                        if (cardError) {
+                            throw new Error(cardError.message);
+                        }
+
+                        // Confirm the card payment
+                        result = await stripe.confirmCardPayment(data.clientSecret, {
+                            payment_method: {
+                                card: card,
+                                billing_details: {
+                                    name: '<%= user.fullname %>'
+                                }
+                            }
+                        });
+
+                        if (result.error) {
+                            const errorElement = document.getElementById('card-errors');
+                            errorElement.textContent = result.error.message;
+                            submitButton.disabled = false;
+                            return;
+                        }
+
+                        console.log('Card payment confirmed:', result);
+
+                        // Create a hidden form and submit it
+                        const hiddenForm = document.createElement('form');
+                        hiddenForm.method = 'POST';
+                        hiddenForm.action = '/memberPayment';
+
+                        // Add CSRF token
+                        const csrfInput = document.createElement('input');
+                        csrfInput.type = 'hidden';
+                        csrfInput.name = '_csrf';
+                        csrfInput.value = '<%= csrfToken %>';
+                        hiddenForm.appendChild(csrfInput);
+
+                        // Add payment data
+                        const fields = {
+                            paymentMethod: paymentMethod,
+                            paymentType: paymentType,
+                            paymentIntentId: result.paymentIntent.id,
+                            referenceNumber: result.paymentIntent.id,
+                            selectedNames: JSON.stringify(selectedNames)
+                        };
+
+                        for (const [key, value] of Object.entries(fields)) {
+                            if (key === 'selectedNames') {
+                                const textarea = document.createElement('textarea');
+                                textarea.name = key;
+                                textarea.style.display = 'none';
+                                textarea.value = value;
+                                hiddenForm.appendChild(textarea);
+                            } else {
+                                const input = document.createElement('input');
+                                input.type = 'hidden';
+                                input.name = key;
+                                input.value = value;
+                                hiddenForm.appendChild(input);
+                            }
+                        }
+
+                        // Add the form to the document and submit it
+                        document.body.appendChild(hiddenForm);
+                        hiddenForm.submit();
+
+                    } else if (paymentMethod === 'FPX') {
+                        // Confirm the FPX payment (no manual bank validation needed)
+                        result = await stripe.confirmFpxPayment(data.clientSecret, {
+                            payment_method: {
+                                fpx: fpx
+                            },
+                            return_url: window.location.origin + '/payment-success'
+                        });
+
+                        // After successful FPX payment confirmation, submit the payment data
+                        if (result && result.paymentIntent && result.paymentIntent.status === 'succeeded') {
+                            const hiddenForm = document.createElement('form');
+                            hiddenForm.method = 'POST';
+                            hiddenForm.action = '/memberPayment';
+
+                            // Add CSRF token
+                            const csrfInput = document.createElement('input');
+                            csrfInput.type = 'hidden';
+                            csrfInput.name = '_csrf';
+                            csrfInput.value = '<%= csrfToken %>';
+                            hiddenForm.appendChild(csrfInput);
+
+                            // Add payment data
+                            const fields = {
+                                paymentMethod: paymentMethod,
+                                paymentType: paymentType,
+                                paymentIntentId: result.paymentIntent.id,
+                                referenceNumber: result.paymentIntent.id,
+                                selectedNames: JSON.stringify(selectedNames)
+                            };
+
+                            for (const [key, value] of Object.entries(fields)) {
+                                if (key === 'selectedNames') {
+                                    const textarea = document.createElement('textarea');
+                                    textarea.name = key;
+                                    textarea.style.display = 'none';
+                                    textarea.value = value;
+                                    hiddenForm.appendChild(textarea);
+                                } else {
+                                    const input = document.createElement('input');
+                                    input.type = 'hidden';
+                                    input.name = key;
+                                    input.value = value;
+                                    hiddenForm.appendChild(input);
+                                }
+                            }
+
+                            document.body.appendChild(hiddenForm);
+                            hiddenForm.submit();
+                        }
+                    }
+                } catch (error) {
+                    console.error('Error:', error);
+                    const errorElement = document.getElementById(paymentMethod === 'Credit Card' ? 'card-errors' : 'fpx-errors');
+                    errorElement.textContent = error.message || 'An error occurred. Please try again.';
+                    submitButton.disabled = false;
+                }
+            });
+
+            // Add validation for payment type change
+            document.getElementById('paymentType').addEventListener('change', function(e) {
+                const paymentMethod = document.getElementById('paymentMethod');
+                const submitButton = document.getElementById('submit-button');
+                
+                // Reset payment method when payment type changes
+                paymentMethod.value = '';
+                
+                // Hide payment sections
+                document.getElementById('fpxSection').style.display = 'none';
+                document.getElementById('creditCardSection').style.display = 'none';
+                
+                // Update summary
+                updatePaymentSummary();
+            });
+
+            // Add validation for payment method change
+            document.getElementById('paymentMethod').addEventListener('change', function(e) {
+                const submitButton = document.getElementById('submit-button');
+                const fpxSection = document.getElementById('fpxSection');
+                const creditCardSection = document.getElementById('creditCardSection');
+                
+                // Clear previous errors
+                document.getElementById('fpx-errors').textContent = '';
+                document.getElementById('card-errors').textContent = '';
+                
+                fpxSection.style.display = 'none';
+                creditCardSection.style.display = 'none';
+                
+                if (e.target.value === 'FPX') {
+                    fpxSection.style.display = 'block';
+                } else if (e.target.value === 'Credit Card') {
+                    creditCardSection.style.display = 'block';
+                }
+            });
+
+            // Add payment type filter to payment history
+            document.getElementById('filterPaymentType').addEventListener('change', function() {
+                const selectedType = this.value;
+                const tableRows = document.querySelectorAll('#paymentHistoryTable tbody tr');
+
+                tableRows.forEach(row => {
+                    const paymentTypeCell = row.cells[2]; // Assuming 'Payment Type' is the 3rd column (index 2)
+                    const paymentType = paymentTypeCell.textContent.trim().toLowerCase();
+                    if (selectedType === '' || paymentType === selectedType.toLowerCase()) {
+                        row.style.display = '';
+                    } else {
+                        row.style.display = 'none';
+                    }
+                });
+            });
+            
+            function filterPayments(status) {
+                const searchText = document.getElementById('searchInput').value.toLowerCase();
+                const rows = document.querySelectorAll('#paymentHistoryTable tbody tr');
+
+                rows.forEach(row => {
+                    const paymentTypeCell = row.cells[2]; // Assuming 'Payment Type' is the 3rd column (index 2)
+                    const paymentType = paymentTypeCell.textContent.trim().toLowerCase();
+                    const rowText = row.textContent.toLowerCase();
+
+                    if (status === 'all') {
+                        row.style.display = rowText.includes(searchText) ? '' : 'none';
+                    } else {
+                        const statusMatch = paymentType === status.toLowerCase();
+                        const searchMatch = rowText.includes(searchText);
+                        row.style.display = (statusMatch && searchMatch) ? '' : 'none';
+                    }
+                });
+            }
+        </script>
+
+        <!-- Payment History -->
+        <div class="card shadow-sm">
+            <div class="card-header bg-primary text-white py-3">
+                <h4 class="mb-0">Payment History</h4>
+            </div>
+            <div class="card-body">
+                <div class="mb-3">
+                    <label for="filterPaymentType" class="form-label">Filter by Type:</label>
+                    <select class="form-select" id="filterPaymentType" onchange="filterPayments(this.value)">
+                        <option value="all">All</option>
+                        <option value="khairat">Khairat Fee</option>
+                        <option value="maintenance">Maintenance Fee</option>
+                    </select>
+                </div>
+                <div class="mb-3">
+                    <label for="searchInput" class="form-label">Search:</label>
+                    <input type="text" class="form-control" id="searchInput" onkeyup="filterPayments(document.getElementById('filterPaymentType').value)">
+                </div>
+                <% if (payments && payments.length > 0) { %>
+                    <table class="table table-hover" id="paymentHistoryTable">
+                        <thead>
+                            <tr>
+                                <th>Date</th>
+                                <th>Amount</th>
+                                <th>Payment Type</th>
+                                <th>Status</th>
+                                <th>Due Date</th>
+                                <th>Payment Method</th>
+                                <th>Reference Number</th>
+                                <th>Action</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            <% payments.forEach(payment => { %>
+                                <tr>
+                                    <td><%= format(new Date(payment.paymentDate), 'dd/MM/yyyy') %></td>
+                                    <td>RM<%= payment.amount.toFixed(2) %></td>
+                                    <td><%= payment.paymentType %></td>
+                                    <td>
+                                        <span class="badge <%= payment.status === 'Paid' ? 'bg-success' : payment.status === 'Overdue' ? 'bg-danger' : 'bg-warning' %>">
+                                            <%= payment.status %>
+                                        </span>
+                                    </td>
+                                    <td><%= format(new Date(payment.dueDate), 'dd/MM/yyyy') %></td>
+                                    <td><%= payment.paymentMethod %></td>
+                                    <td><%= payment.referenceNumber %></td>
+                                    <td>
+                                        <a href="/receipt/<%= payment._id %>" class="btn btn-sm btn-info" target="_blank">View Receipt</a>
+                                    </td>
+                                </tr>
+                            <% }); %>
+                        </tbody>
+                    </table>
+                    <div class="d-flex justify-content-center mt-3">
+                        <nav aria-label="Payment history pagination">
+                            <ul class="pagination">
+                                <% if (currentPage > 1) { %>
+                                    <li class="page-item">
+                                        <a class="page-link" href="?page=<%= currentPage - 1 %>">Previous</a>
+                                    </li>
+                                <% } else { %>
+                                    <li class="page-item disabled">
+                                        <span class="page-link">Previous</span>
+                                    </li>
+                                <% } %>
+                                <% for (let i = 1; i <= totalPages; i++) { %>
+                                    <li class="page-item <%= i === currentPage ? 'active' : '' %>">
+                                        <a class="page-link" href="?page=<%= i %>"><%= i %></a>
+                                    </li>
+                                <% } %>
+                                <% if (currentPage < totalPages) { %>
+                                    <li class="page-item">
+                                        <a class="page-link" href="?page=<%= currentPage + 1 %>">Next</a>
+                                    </li>
+                                <% } else { %>
+                                    <li class="page-item disabled">
+                                        <span class="page-link">Next</span>
+                                    </li>
+                                <% } %>
+                            </ul>
+                        </nav>
+                    </div>
+                <% } else { %>
+                    <div class="text-center py-4">
+                        <p class="text-muted">No payment history found.</p>
+                    </div>
+                <% } %>
+            </div>
+        </div>
+    </div>
+</div>
+</body>
+
+<%- include('include/footer') %>
