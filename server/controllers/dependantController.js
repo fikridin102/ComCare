@@ -1,5 +1,6 @@
 const Dependant = require('../models/dependant');
 const User = require('../models/user');
+const { sendEmail, notifyHeir } = require('../utils/emailer');
 
 // Get all dependants for admin view
 exports.getAdminDependants = async (req, res) => {
@@ -109,7 +110,11 @@ exports.addDependant = async (req, res) => {
         } = req.body;
 
         const memberId = req.session.user._id;
-        const memberName = req.session.user.fullname;
+        const member = await User.findById(memberId);
+        if (!member) {
+            req.flash('error', 'Member not found');
+            return res.redirect('/dependants');
+        }
 
         // If this is a new heir, check if member already has an heir
         if (isHeir === 'true' || isHeir === true) {
@@ -132,12 +137,39 @@ exports.addDependant = async (req, res) => {
             gender,
             relationship,
             memberId,
-            memberName,
+            memberName: member.fullname,
             isHeir: isHeir === 'true' || isHeir === true,
             heirEmail: isHeir === 'true' || isHeir === true ? heirEmail : undefined
         });
 
         await dependant.save();
+
+        // Send notification to member
+        const subject = 'New Dependant Added';
+        const html = `
+            <p>Dear ${member.fullname},</p>
+            <p>A new dependant has been added to your account:</p>
+            <ul>
+                <li>Name: ${name}</li>
+                <li>Relationship: ${relationship}</li>
+                <li>Is Heir: ${isHeir === 'true' || isHeir === true ? 'Yes' : 'No'}</li>
+            </ul>
+            <p>Best regards,<br>The ComCare Team</p>
+        `;
+        await sendEmail(member.email, subject, html);
+
+        // If this is a new heir, send welcome email to heir
+        if (isHeir === 'true' || isHeir === true && heirEmail) {
+            const heirSubject = 'You Have Been Designated as an Heir';
+            const heirHtml = `
+                <p>Dear ${name},</p>
+                <p>You have been designated as an heir for ${member.fullname}'s ComCare account.</p>
+                <p>You will receive notifications about important activities related to this account.</p>
+                <p>Best regards,<br>The ComCare Team</p>
+            `;
+            await sendEmail(heirEmail, heirSubject, heirHtml);
+        }
+
         req.flash('success', 'Dependant added successfully');
         res.redirect('/dependants');
     } catch (error) {
@@ -155,16 +187,48 @@ exports.addDependant = async (req, res) => {
 exports.deleteDependant = async (req, res) => {
     try {
         const dependantId = req.params.id;
-        const deletedDependant = await Dependant.findByIdAndDelete(dependantId);
-        if (!deletedDependant) {
+        const dependant = await Dependant.findById(dependantId);
+        
+        if (!dependant) {
             req.flash("error", "Dependant not found");
             return res.redirect("/admindependant");
         }
-        req.flash("success", "Dependant deleted successfully!");
+
+        const member = await User.findById(dependant.memberId);
+        if (member) {
+            // Send notification to member
+            const subject = 'Dependant Removed';
+            const html = `
+                <p>Dear ${member.fullname},</p>
+                <p>The following dependant has been removed from your account:</p>
+                <ul>
+                    <li>Name: ${dependant.name}</li>
+                    <li>Relationship: ${dependant.relationship}</li>
+                    <li>Was Heir: ${dependant.isHeir ? 'Yes' : 'No'}</li>
+                </ul>
+                <p>Best regards,<br>The ComCare Team</p>
+            `;
+            await sendEmail(member.email, subject, html);
+
+            // If this was an heir, notify them
+            if (dependant.isHeir && dependant.heirEmail) {
+                const heirSubject = 'Heir Status Removed';
+                const heirHtml = `
+                    <p>Dear ${dependant.name},</p>
+                    <p>Your status as an heir for ${member.fullname}'s ComCare account has been removed.</p>
+                    <p>You will no longer receive notifications about this account.</p>
+                    <p>Best regards,<br>The ComCare Team</p>
+                `;
+                await sendEmail(dependant.heirEmail, heirSubject, heirHtml);
+            }
+        }
+
+        await Dependant.findByIdAndDelete(dependantId);
+        req.flash("success", "Dependant deleted successfully");
         res.redirect("/admindependant");
     } catch (error) {
         console.error("Error deleting dependant:", error);
-        req.flash("error", "Server error. Please try again later.");
+        req.flash("error", "Error deleting dependant");
         res.redirect("/admindependant");
     }
 };
@@ -189,6 +253,12 @@ exports.updateDependant = async (req, res) => {
             return res.redirect('/dependants');
         }
 
+        const member = await User.findById(dependant.memberId);
+        if (!member) {
+            req.flash('error', 'Member not found');
+            return res.redirect('/dependants');
+        }
+
         // If changing to heir, check if member already has an heir
         if ((isHeir === 'true' || isHeir === true) && !dependant.isHeir) {
             const existingHeir = await Dependant.findOne({
@@ -198,11 +268,20 @@ exports.updateDependant = async (req, res) => {
             });
 
             if (existingHeir) {
-                req.flash('error', 'You already have an heir. Please remove the existing heir first or update their status.');
+                req.flash('error', 'Member already has an heir. Please remove the existing heir first.');
                 return res.redirect('/dependants');
             }
         }
 
+        // Track changes for notification
+        const changes = [];
+        if (dependant.name !== name) changes.push(`Name changed to: ${name}`);
+        if (dependant.relationship !== relationship) changes.push(`Relationship changed to: ${relationship}`);
+        if (dependant.isHeir !== (isHeir === 'true' || isHeir === true)) {
+            changes.push(`Heir status changed to: ${isHeir === 'true' || isHeir === true ? 'Yes' : 'No'}`);
+        }
+
+        // Update dependant
         dependant.name = name;
         dependant.ic = ic;
         dependant.birthday = birthday;
@@ -213,15 +292,39 @@ exports.updateDependant = async (req, res) => {
         dependant.heirEmail = isHeir === 'true' || isHeir === true ? heirEmail : undefined;
 
         await dependant.save();
+
+        // Send notifications if there were changes
+        if (changes.length > 0) {
+            // Notify member
+            const subject = 'Dependant Information Updated';
+            const html = `
+                <p>Dear ${member.fullname},</p>
+                <p>The following changes have been made to your dependant's information:</p>
+                <ul>
+                    ${changes.map(change => `<li>${change}</li>`).join('')}
+                </ul>
+                <p>Best regards,<br>The ComCare Team</p>
+            `;
+            await sendEmail(member.email, subject, html);
+
+            // If heir status changed, notify the heir
+            if (dependant.isHeir && dependant.heirEmail) {
+                const heirSubject = 'Heir Status Updated';
+                const heirHtml = `
+                    <p>Dear ${name},</p>
+                    <p>Your status as an heir for ${member.fullname}'s ComCare account has been updated.</p>
+                    <p>You will continue to receive notifications about important activities related to this account.</p>
+                    <p>Best regards,<br>The ComCare Team</p>
+                `;
+                await sendEmail(dependant.heirEmail, heirSubject, heirHtml);
+            }
+        }
+
         req.flash('success', 'Dependant updated successfully');
         res.redirect('/dependants');
     } catch (error) {
         console.error('Error updating dependant:', error);
-        if (error.message === 'A member can only have one heir') {
-            req.flash('error', 'You already have an heir. Please remove the existing heir first or update their status.');
-        } else {
-            req.flash('error', 'Error updating dependant');
-        }
+        req.flash('error', 'Error updating dependant');
         res.redirect('/dependants');
     }
 };

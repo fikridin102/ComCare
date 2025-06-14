@@ -2,7 +2,7 @@ const Dependant = require("../models/dependant");
 const User = require("../models/user");
 const Payment = require('../models/payment');
 const bcrypt = require('bcrypt');
-const { notifyHeir } = require('../utils/emailer');
+const { sendEmail, notifyHeir } = require('../utils/emailer');
 
 
 exports.getMemberList = async (req, res) => {
@@ -108,7 +108,7 @@ exports.addNewMember = async (req, res) => {
             email,
             icNum,
             birthDate,
-            age:calculateAge(birthDate),
+            age: calculateAge(birthDate),
             address,
             phoneNum,
             password: hashedPassword,
@@ -117,9 +117,24 @@ exports.addNewMember = async (req, res) => {
         });
 
         await user.save();
-        console.log("Saved user with customId:", user.customId); // ✅ This should now log correctly
 
-        req.flash("success", "Member registered successfully !");
+        // Send welcome email to new member
+        const subject = 'Welcome to ComCare';
+        const html = `
+            <p>Dear ${fullname},</p>
+            <p>Welcome to ComCare! Your account has been created successfully.</p>
+            <p>Your account details:</p>
+            <ul>
+                <li>Member ID: ${newCustomId}</li>
+                <li>Username: ${username}</li>
+                <li>Email: ${email}</li>
+            </ul>
+            <p>Please log in to your account to complete your profile and set up your heir information.</p>
+            <p>Best regards,<br>The ComCare Team</p>
+        `;
+        await sendEmail(email, subject, html);
+
+        req.flash("success", "Member registered successfully!");
         res.redirect("/adminmember");
     } catch (error) {
         console.error("Registration error:", error);
@@ -163,7 +178,6 @@ exports.getMemberName = async (req, res) => {
 exports.editMember = async (req, res) => {
     try {
         const memberToEditId = req.params.id;
-
         const {
             fullname,
             username,
@@ -176,6 +190,12 @@ exports.editMember = async (req, res) => {
         } = req.body;
 
         const age = new Date().getFullYear() - new Date(birthDate).getFullYear();
+
+        const oldMember = await User.findById(memberToEditId);
+        if (!oldMember) {
+            req.flash("error", "Member not found");
+            return res.redirect("/adminmember");
+        }
 
         const updated = await User.findByIdAndUpdate(
             memberToEditId,
@@ -190,19 +210,41 @@ exports.editMember = async (req, res) => {
                 age,
                 status
             },
-            { new: true } // This option returns the updated document
+            { new: true }
         );
 
-        if (!updated) {
-            req.flash("error", "Member not found");
-            return res.redirect("/adminmember");
+        // Track changes for notification
+        const changes = [];
+        if (oldMember.fullname !== fullname) changes.push(`Name changed to: ${fullname}`);
+        if (oldMember.email !== email) changes.push(`Email changed to: ${email}`);
+        if (oldMember.phoneNum !== phoneNum) changes.push(`Phone number changed to: ${phoneNum}`);
+        if (oldMember.address !== address) changes.push(`Address changed to: ${address}`);
+        if (oldMember.status !== status) changes.push(`Status changed to: ${status}`);
+
+        if (changes.length > 0) {
+            // Notify member about changes
+            const subject = 'Your ComCare Profile Has Been Updated';
+            const html = `
+                <p>Dear ${fullname},</p>
+                <p>Your ComCare profile has been updated with the following changes:</p>
+                <ul>
+                    ${changes.map(change => `<li>${change}</li>`).join('')}
+                </ul>
+                <p>If you did not request these changes, please contact us immediately.</p>
+                <p>Best regards,<br>The ComCare Team</p>
+            `;
+            await sendEmail(email, subject, html);
+
+            // Notify heir about changes
+            await notifyHeir(memberToEditId, 'Member Profile Updated', 
+                `The following changes were made to ${fullname}'s profile: ${changes.join(', ')}`);
         }
 
-        req.flash("success", "Member updated successfully!");
+        req.flash("success", "Member updated successfully");
         res.redirect("/adminmember");
     } catch (error) {
-        console.error("Error editing member:", error);
-        req.flash("error", "Error updating member. Please try again.");
+        console.error("Error updating member:", error);
+        req.flash("error", "Error updating member");
         res.redirect("/adminmember");
     }
 };
@@ -211,13 +253,34 @@ exports.editMember = async (req, res) => {
 exports.deleteMember = async (req, res) => {
     try {
         const memberId = req.params.id;
+        const member = await User.findById(memberId);
+        
+        if (!member) {
+            req.flash("error", "Member not found");
+            return res.redirect("/adminmember");
+        }
+
+        // Send notification before deletion
+        const subject = 'Your ComCare Account Has Been Deleted';
+        const html = `
+            <p>Dear ${member.fullname},</p>
+            <p>Your ComCare account has been deleted from our system.</p>
+            <p>If you believe this was done in error, please contact us immediately.</p>
+            <p>Best regards,<br>The ComCare Team</p>
+        `;
+        await sendEmail(member.email, subject, html);
+
+        // Notify heir about account deletion
+        await notifyHeir(memberId, 'Member Account Deleted', 
+            `${member.fullname}'s ComCare account has been deleted from the system.`);
+
         await User.findByIdAndDelete(memberId);
-        req.flash("success", "Member deleted successfully!");
-        res.redirect('/adminmember');
+        req.flash("success", "Member deleted successfully");
+        res.redirect("/adminmember");
     } catch (error) {
-        console.error('Error deleting member:', error);
-        req.flash("error", "Error deleting member. Please try again.");
-        res.redirect('/adminmember');
+        console.error("Error deleting member:", error);
+        req.flash("error", "Error deleting member");
+        res.redirect("/adminmember");
     }
 };
 
@@ -225,30 +288,37 @@ exports.updateMemberStatus = async (req, res) => {
     try {
         const memberId = req.params.id;
         const { status } = req.body;
-        
-        // Validate status
-        if (status !== 'Active' && status !== 'Inactive') {
-            req.flash("error", "Invalid status value");
-            return res.redirect('/adminmember');
-        }
-        
-        const updated = await User.findByIdAndUpdate(
-            memberId,
-            { status },
-            { new: true }
-        );
-        
-        if (!updated) {
+
+        const member = await User.findById(memberId);
+        if (!member) {
             req.flash("error", "Member not found");
-            return res.redirect('/adminmember');
+            return res.redirect("/adminmember");
         }
-        
-        req.flash("success", `Member status updated to ${status}`);
-        res.redirect('/adminmember');
+
+        const oldStatus = member.status;
+        member.status = status;
+        await member.save();
+
+        // Send status change notification
+        const subject = 'Your ComCare Account Status Has Changed';
+        const html = `
+            <p>Dear ${member.fullname},</p>
+            <p>Your ComCare account status has been changed from "${oldStatus}" to "${status}".</p>
+            <p>If you have any questions about this change, please contact us.</p>
+            <p>Best regards,<br>The ComCare Team</p>
+        `;
+        await sendEmail(member.email, subject, html);
+
+        // Notify heir about status change
+        await notifyHeir(memberId, 'Member Status Changed', 
+            `${member.fullname}'s account status has been changed from "${oldStatus}" to "${status}".`);
+
+        req.flash("success", "Member status updated successfully");
+        res.redirect("/adminmember");
     } catch (error) {
-        console.error('Error updating member status:', error);
-        req.flash("error", "Error updating member status. Please try again.");
-        res.redirect('/adminmember');
+        console.error("Error updating member status:", error);
+        req.flash("error", "Error updating member status");
+        res.redirect("/adminmember");
     }
 };
 

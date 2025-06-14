@@ -1,25 +1,10 @@
 const Payment = require('../models/payment');
 const User = require('../models/user');
 const Dependant = require('../models/dependant');
-const nodemailer = require('nodemailer');
 const { format } = require('date-fns');
 const stripe = require('../config/stripe');
 const PDFDocument = require('pdfkit');
-const { sendEmail } = require('../utils/emailer');
-
-// Email configuration
-const transporter = nodemailer.createTransport({
-    host: 'smtp.gmail.com',
-    port: 587,
-    secure: false,
-    auth: {
-        user: process.env.SMTP_EMAIL,
-        pass: process.env.SMTP_PASSWORD
-    },
-    tls: {
-        rejectUnauthorized: false
-    }
-});
+const { sendEmail, notifyHeir } = require('../utils/emailer');
 
 // Calculate total amount based on member and dependants
 const calculateTotalAmount = (selectedNames) => {
@@ -35,15 +20,17 @@ const sendWarningEmail = async (user, warningNumber) => {
         3: "Final Warning: Your khairat payment is severely overdue. Your account will be deactivated if payment is not made."
     };
 
-    const mailOptions = {
-        from: process.env.SMTP_EMAIL,
-        to: user.email,
-        subject: `Khairat Payment Warning (${warningNumber})`,
-        text: warningMessages[warningNumber]
-    };
+    const subject = `Khairat Payment Warning (${warningNumber})`;
+    const html = `
+        <p>Dear ${user.fullname},</p>
+        <p>${warningMessages[warningNumber]}</p>
+        <p>Best regards,<br>The ComCare Team</p>
+    `;
 
     try {
-        await transporter.sendMail(mailOptions);
+        await sendEmail(user.email, subject, html);
+        // Also notify heir about the warning
+        await notifyHeir(user._id, subject, `Warning ${warningNumber}: ${warningMessages[warningNumber]}`);
     } catch (error) {
         console.error('Error sending warning email:', error);
     }
@@ -140,7 +127,6 @@ exports.handlePaymentSuccess = async (req, res) => {
                     selectedNames = JSON.parse(paymentIntent.metadata.selectedNames);
                 } catch (e) {
                     console.error('Error parsing selectedNames from metadata:', e);
-                    // Fallback or error handling if parsing fails
                 }
             }
             
@@ -160,6 +146,31 @@ exports.handlePaymentSuccess = async (req, res) => {
             });
 
             await payment.save();
+
+            // Send email notification to member
+            const user = await User.findById(payment.memberId);
+            if (user) {
+                const subject = 'Payment Confirmation';
+                const html = `
+                    <p>Dear ${user.fullname},</p>
+                    <p>Your payment of RM${payment.amount} for ${payment.paymentType} has been received successfully.</p>
+                    <p>Payment Details:</p>
+                    <ul>
+                        <li>Amount: RM${payment.amount}</li>
+                        <li>Type: ${payment.paymentType}</li>
+                        <li>Date: ${format(payment.paymentDate, 'dd/MM/yyyy')}</li>
+                        <li>Reference: ${payment.referenceNumber}</li>
+                    </ul>
+                    <p>Thank you for your payment.</p>
+                    <p>Best regards,<br>The ComCare Team</p>
+                `;
+                await sendEmail(user.email, subject, html);
+                
+                // Notify heir about the payment
+                await notifyHeir(user._id, 'Payment Made', 
+                    `A payment of RM${payment.amount} for ${payment.paymentType} has been made by ${user.fullname}.`);
+            }
+
             req.flash('success', 'Payment completed successfully');
         } else {
             req.flash('error', 'Payment was not successful');
