@@ -17,8 +17,17 @@ const transporter = nodemailer.createTransport({
 // Function to send email
 const sendEmail = async (to, subject, html) => {
     try {
-        console.log('Attempting to send email to:', to);
-        console.log('Using SMTP email:', process.env.SMTP_EMAIL);
+        console.log('=== EMAIL SENDING ATTEMPT ===');
+        console.log('To:', to);
+        console.log('Subject:', subject);
+        console.log('From:', process.env.SMTP_EMAIL);
+        console.log('SMTP Config:', {
+            host: 'smtp.gmail.com',
+            port: 587,
+            secure: false,
+            user: process.env.SMTP_EMAIL ? 'Set' : 'Not Set',
+            pass: process.env.SMTP_PASSWORD ? 'Set' : 'Not Set'
+        });
 
         const mailOptions = {
             from: process.env.SMTP_EMAIL,
@@ -28,15 +37,18 @@ const sendEmail = async (to, subject, html) => {
         };
 
         const info = await transporter.sendMail(mailOptions);
-        console.log('Email sent successfully:', info.response);
+        console.log('=== EMAIL SENT SUCCESSFULLY ===');
+        console.log('Message ID:', info.messageId);
+        console.log('Response:', info.response);
+        console.log('=============================');
         return true;
     } catch (error) {
-        console.error('Error sending email:', error);
-        console.error('Error details:', {
-            message: error.message,
-            code: error.code,
-            command: error.command
-        });
+        console.error('=== EMAIL SENDING FAILED ===');
+        console.error('Error:', error.message);
+        console.error('Code:', error.code);
+        console.error('Command:', error.command);
+        console.error('Stack:', error.stack);
+        console.error('===========================');
         return false;
     }
 };
@@ -44,7 +56,9 @@ const sendEmail = async (to, subject, html) => {
 // Function to notify heir about member activities
 const notifyHeir = async (memberId, subject, message) => {
     try {
-        console.log('Attempting to notify heir for member:', memberId);
+        console.log('=== HEIR NOTIFICATION ATTEMPT ===');
+        console.log('Member ID:', memberId);
+        console.log('Subject:', subject);
         
         const Dependant = require('../models/dependant');
         const heir = await Dependant.findOne({ 
@@ -52,9 +66,13 @@ const notifyHeir = async (memberId, subject, message) => {
             isHeir: true 
         });
 
-        console.log('Found heir:', heir ? 'Yes' : 'No');
+        console.log('Heir found:', heir ? 'Yes' : 'No');
         if (heir) {
-            console.log('Heir email:', heir.heirEmail);
+            console.log('Heir details:', {
+                name: heir.name,
+                email: heir.heirEmail,
+                isHeir: heir.isHeir
+            });
         }
 
         if (heir && heir.heirEmail) {
@@ -65,18 +83,21 @@ const notifyHeir = async (memberId, subject, message) => {
             `;
 
             const emailSent = await sendEmail(heir.heirEmail, subject, html);
-            console.log('Email sent to heir:', emailSent ? 'Yes' : 'No');
+            console.log('=== HEIR NOTIFICATION RESULT ===');
+            console.log('Email sent:', emailSent ? 'Success' : 'Failed');
+            console.log('===============================');
             return emailSent;
         } else {
-            console.log('No heir email found for member:', memberId);
+            console.log('=== HEIR NOTIFICATION SKIPPED ===');
+            console.log('Reason: No heir email found for member:', memberId);
+            console.log('=================================');
         }
         return false;
     } catch (error) {
-        console.error('Error notifying heir:', error);
-        console.error('Error details:', {
-            message: error.message,
-            stack: error.stack
-        });
+        console.error('=== HEIR NOTIFICATION ERROR ===');
+        console.error('Error:', error.message);
+        console.error('Stack:', error.stack);
+        console.error('==============================');
         return false;
     }
 };
