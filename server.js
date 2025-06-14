@@ -9,11 +9,29 @@ const flash = require("connect-flash");
 const csrf = require('csurf');
 const multer = require('multer');
 const csrfDebugMiddleware = require('./server/middleware/csrfDebugMiddleware');
+const path = require('path');
 
-dotenv.config({ path: "config.env" });
+// Load environment variables from .env file
+dotenv.config();
+
+// Set default values for required environment variables
+const env = {
+    PORT: process.env.PORT || 3000,
+    MONGO_URI: process.env.MONGO_URI,
+    JWT_SECRET: process.env.JWT_SECRET,
+    SMTP_EMAIL: process.env.SMTP_EMAIL,
+    SMTP_PASSWORD: process.env.SMTP_PASSWORD
+};
+
+// Log environment configuration (without sensitive data)
+console.log('Environment configuration:');
+console.log('PORT:', env.PORT);
+console.log('MONGO_URI:', env.MONGO_URI ? 'Set' : 'Not set');
+console.log('JWT_SECRET:', env.JWT_SECRET ? 'Set' : 'Not set');
+console.log('SMTP_EMAIL:', env.SMTP_EMAIL);
+console.log('SMTP_PASSWORD:', env.SMTP_PASSWORD ? '******' : 'Not set');
 
 const app = express();
-const PORT = process.env.PORT || 8080;
 
 // Basic middleware
 app.use(express.urlencoded({ extended: true }));
@@ -117,6 +135,6 @@ app.use((err, req, res, next) => {
 });
 
 // Start Server
-app.listen(PORT, () => {
-    console.log(`Server is running on http://localhost:${PORT}`);
+app.listen(env.PORT, () => {
+    console.log(`Server is running on http://localhost:${env.PORT}`);
 });

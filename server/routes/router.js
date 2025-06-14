@@ -17,6 +17,7 @@ const csrf = require('csurf');
 const csrfDebugMiddleware = require('../middleware/csrfDebugMiddleware');
 const nodemailer = require('nodemailer'); // Import nodemailer
 const Dependant = require('../models/dependant');
+const { sendEmail } = require('../utils/emailer');
 
 // Setup CSRF Protection locally in router.js
 // const csrfProtection = csrf({ cookie: false });
@@ -172,87 +173,57 @@ router.get("/api/announcements", announcementController.getAllAnnouncements);
 // Profile Update Route
 router.post("/update-profile", isAuthenticated, uploadProfile.single('profilePicture'), csrfDebugMiddleware, async (req, res) => {
     try {
-        const userId = req.session.user.id;
-
-        // Fetch the old user data before updating
-        const oldUser = await User.findById(userId);
-        if (!oldUser) {
-            req.flash('error', 'User not found.');
-            return res.redirect(req.session.user.userType === 'admin' ? '/adminprofile' : '/userprofile');
-        }
-
-        const updateData = { ...req.body };
+        const userId = req.session.user._id;
+        const user = await User.findById(userId);
         
-        if (req.file) {
-            updateData.profilePicture = '/uploads/profiles/' + req.file.filename;
+        if (!user) {
+            req.flash('error', 'User not found');
+            return res.redirect('/userprofile');
         }
 
-        const updatedUser = await User.findByIdAndUpdate(
-            userId,
-            updateData,
-            { new: true }
-        );
-
-        if (!updatedUser) {
-            req.flash('error', 'Failed to update profile.');
-            return res.redirect(req.session.user.userType === 'admin' ? '/adminprofile' : '/userprofile');
-        }
-
-        // Compare old and new data to detect changes
+        // Track changes
         const changes = [];
-        for (const key in req.body) {
-            if (Object.prototype.hasOwnProperty.call(req.body, key)) {
-                if (key === 'password' || key === 'passwordConfirm') continue; // Skip password fields for comparison
-                
-                const oldValue = oldUser[key];
-                const newValue = req.body[key];
-
-                if (oldValue !== newValue) {
-                    changes.push(`${key}: ${oldValue || 'N/A'} -> ${newValue}`);
-                }
-            }
+        
+        // Update fields if provided
+        if (req.body.fullname && req.body.fullname !== user.fullname) {
+            user.fullname = req.body.fullname;
+            changes.push(`Name changed to: ${req.body.fullname}`);
+        }
+        if (req.body.phoneNum && req.body.phoneNum !== user.phoneNum) {
+            user.phoneNum = req.body.phoneNum;
+            changes.push(`Phone number changed to: ${req.body.phoneNum}`);
+        }
+        if (req.body.address && req.body.address !== user.address) {
+            user.address = req.body.address;
+            changes.push(`Address changed to: ${req.body.address}`);
+        }
+        if (req.file) {
+            user.profilePicture = '/uploads/profiles/' + req.file.filename;
+            changes.push('Profile picture updated');
         }
 
-        // Check for profile picture change
-        if (req.file && oldUser.profilePicture !== updatedUser.profilePicture) {
-            changes.push(`profilePicture: ${oldUser.profilePicture || 'N/A'} -> ${updatedUser.profilePicture}`);
-        }
+        const updatedUser = await user.save();
 
         // Send email notification to heir if changes occurred and heir exists
         if (changes.length > 0) {
             const heir = await Dependant.findOne({ memberId: userId, isHeir: true });
             if (heir && heir.heirEmail) {
-                const transporter = nodemailer.createTransport({
-                    service: 'gmail',
-                    auth: {
-                        user: process.env.EMAIL_USER,
-                        pass: process.env.EMAIL_PASS
-                    }
-                });
+                const emailHtml = `
+                    <p>Dear ${heir.name},</p>
+                    <p>This is to inform you that the profile of ${updatedUser.fullname} has been updated.</p>
+                    <p>Details of changes:</p>
+                    <ul>
+                        ${changes.map(change => `<li>${change}</li>`).join('')}
+                    </ul>
+                    <p>If you have any concerns, please contact support.</p>
+                    <p>Best regards,<br>The ComCare Team</p>
+                `;
 
-                const mailOptions = {
-                    from: process.env.EMAIL_USER,
-                    to: heir.heirEmail,
-                    subject: 'Member Profile Update Notification',
-                    html: `
-                        <p>Dear ${heir.name},</p>
-                        <p>This is to inform you that the profile of ${updatedUser.fullname} has been updated.</p>
-                        <p>Details of changes:</p>
-                        <ul>
-                            ${changes.map(change => `<li>${change}</li>`).join('')}
-                        </ul>
-                        <p>If you have any concerns, please contact support.</p>
-                        <p>Best regards,<br>The ComCare Team</p>
-                    `,
-                };
-
-                transporter.sendMail(mailOptions, (error, info) => {
-                    if (error) {
-                        console.error('Error sending email notification to heir:', error);
-                    } else {
-                        console.log('Email notification sent to heir:', info.response);
-                    }
-                });
+                await sendEmail(
+                    heir.heirEmail,
+                    'Member Profile Update Notification',
+                    emailHtml
+                );
             }
         }
 
@@ -267,7 +238,7 @@ router.post("/update-profile", isAuthenticated, uploadProfile.single('profilePic
     } catch (error) {
         console.error('Error updating profile:', error);
         req.flash('error', 'Error updating profile');
-        res.redirect(req.session.user.userType === 'admin' ? '/adminprofile' : '/userprofile');
+        res.redirect('/userprofile');
     }
 });
 

@@ -97,33 +97,57 @@ exports.getAllDependants = async (req, res) => {
 // Add dependant (admin)
 exports.addDependant = async (req, res) => {
     try {
-        const { name, ic, birthday, gender, relationship, memberId } = req.body;
-        if (!name || !ic || !birthday || !gender || !relationship || !memberId) {
-            req.flash("error", "All fields are required");
-            return res.redirect("/admin/dependants");
+        const {
+            name,
+            ic,
+            birthday,
+            age,
+            gender,
+            relationship,
+            isHeir,
+            heirEmail
+        } = req.body;
+
+        const memberId = req.session.user._id;
+        const memberName = req.session.user.fullname;
+
+        // If this is a new heir, check if member already has an heir
+        if (isHeir === 'true' || isHeir === true) {
+            const existingHeir = await Dependant.findOne({
+                memberId: memberId,
+                isHeir: true
+            });
+
+            if (existingHeir) {
+                req.flash('error', 'You already have an heir. Please remove the existing heir first or update their status.');
+                return res.redirect('/dependants');
+            }
         }
-        const birthDate = new Date(birthday);
-        const today = new Date();
-        let age = today.getFullYear() - birthDate.getFullYear();
-        const monthDiff = today.getMonth() - birthDate.getMonth();
-        if (monthDiff < 0 || (monthDiff === 0 && today.getDate() < birthDate.getDate())) {
-            age--;
-        }
-        const member = await User.findById(memberId);
-        if (!member) {
-            req.flash("error", "Selected member not found");
-            return res.redirect("/admindependant");
-        }
+
         const dependant = new Dependant({
-            name, ic, birthday, age, gender, relationship, memberId, memberName: member.fullname
+            name,
+            ic,
+            birthday,
+            age,
+            gender,
+            relationship,
+            memberId,
+            memberName,
+            isHeir: isHeir === 'true' || isHeir === true,
+            heirEmail: isHeir === 'true' || isHeir === true ? heirEmail : undefined
         });
+
         await dependant.save();
-        req.flash("success", "Dependant added successfully!");
-        res.redirect("/admindependant");
+        req.flash('success', 'Dependant added successfully');
+        res.redirect('/dependants');
     } catch (error) {
-        console.error("Error adding dependant:", error);
-        req.flash("error", "Server error. Please try again later.");
-        res.redirect("/admindependant");
+        console.error('Error adding dependant:', error);
+        if (error.message === 'A member can only have one heir') {
+            req.flash('error', 'You already have an heir. Please remove the existing heir first or update their status.');
+        } else {
+            req.flash('error', 'Error adding dependant');
+        }
+        res.redirect('/dependants');
     }
 };
 
@@ -148,39 +172,57 @@ exports.deleteDependant = async (req, res) => {
 // Update dependant (admin)
 exports.updateDependant = async (req, res) => {
     try {
-        const dependantId = req.params.id;
-        const { name, ic, birthday, gender, relationship, memberId } = req.body;
-        if (!name || !ic || !birthday || !gender || !relationship || !memberId) {
-            req.flash("error", "All fields are required");
-            return res.redirect("/admindependant");
+        const {
+            name,
+            ic,
+            birthday,
+            age,
+            gender,
+            relationship,
+            isHeir,
+            heirEmail
+        } = req.body;
+
+        const dependant = await Dependant.findById(req.params.id);
+        if (!dependant) {
+            req.flash('error', 'Dependant not found');
+            return res.redirect('/dependants');
         }
-        const birthDate = new Date(birthday);
-        const today = new Date();
-        let age = today.getFullYear() - birthDate.getFullYear();
-        const monthDiff = today.getMonth() - birthDate.getMonth();
-        if (monthDiff < 0 || (monthDiff === 0 && today.getDate() < birthDate.getDate())) {
-            age--;
+
+        // If changing to heir, check if member already has an heir
+        if ((isHeir === 'true' || isHeir === true) && !dependant.isHeir) {
+            const existingHeir = await Dependant.findOne({
+                memberId: dependant.memberId,
+                isHeir: true,
+                _id: { $ne: dependant._id }
+            });
+
+            if (existingHeir) {
+                req.flash('error', 'You already have an heir. Please remove the existing heir first or update their status.');
+                return res.redirect('/dependants');
+            }
         }
-        const member = await User.findById(memberId);
-        if (!member) {
-            req.flash("error", "Selected member not found");
-            return res.redirect("/admindependant");
-        }
-        const updatedDependant = await Dependant.findByIdAndUpdate(
-            dependantId,
-            { name, ic, birthday, age, gender, relationship, memberId, memberName: member.fullname },
-            { new: true }
-        );
-        if (!updatedDependant) {
-            req.flash("error", "Dependant not found");
-            return res.redirect("/admindependant");
-        }
-        req.flash("success", "Dependant updated successfully!");
-        res.redirect("/admindependant");
+
+        dependant.name = name;
+        dependant.ic = ic;
+        dependant.birthday = birthday;
+        dependant.age = age;
+        dependant.gender = gender;
+        dependant.relationship = relationship;
+        dependant.isHeir = isHeir === 'true' || isHeir === true;
+        dependant.heirEmail = isHeir === 'true' || isHeir === true ? heirEmail : undefined;
+
+        await dependant.save();
+        req.flash('success', 'Dependant updated successfully');
+        res.redirect('/dependants');
     } catch (error) {
-        console.error("Error updating dependant:", error);
-        req.flash("error", "Server error. Please try again later.");
-        res.redirect("/admindependant");
+        console.error('Error updating dependant:', error);
+        if (error.message === 'A member can only have one heir') {
+            req.flash('error', 'You already have an heir. Please remove the existing heir first or update their status.');
+        } else {
+            req.flash('error', 'Error updating dependant');
+        }
+        res.redirect('/dependants');
     }
 };
 

@@ -5,13 +5,19 @@ const nodemailer = require('nodemailer');
 const { format } = require('date-fns');
 const stripe = require('../config/stripe');
 const PDFDocument = require('pdfkit');
+const { sendEmail } = require('../utils/emailer');
 
 // Email configuration
 const transporter = nodemailer.createTransport({
-    service: 'gmail',
+    host: 'smtp.gmail.com',
+    port: 587,
+    secure: false,
     auth: {
-        user: process.env.EMAIL_USER,
-        pass: process.env.EMAIL_PASS
+        user: process.env.SMTP_EMAIL,
+        pass: process.env.SMTP_PASSWORD
+    },
+    tls: {
+        rejectUnauthorized: false
     }
 });
 
@@ -30,7 +36,7 @@ const sendWarningEmail = async (user, warningNumber) => {
     };
 
     const mailOptions = {
-        from: process.env.EMAIL_USER,
+        from: process.env.SMTP_EMAIL,
         to: user.email,
         subject: `Khairat Payment Warning (${warningNumber})`,
         text: warningMessages[warningNumber]
@@ -390,7 +396,7 @@ exports.sendPaymentReminder = async (req, res) => {
         }
 
         const mailOptions = {
-            from: process.env.EMAIL_USER,
+            from: process.env.SMTP_EMAIL,
             to: payment.memberId.email,
             subject: 'Payment Reminder',
             text: `Dear ${payment.memberId.fullname},\n\n` +
@@ -430,4 +436,169 @@ exports.getReceipt = async (req, res) => {
         console.error('Error rendering receipt:', error);
         res.status(500).render('500', { message: 'Error rendering receipt' });
     }
+};
+
+// Process payment
+exports.processPayment = async (req, res) => {
+    try {
+        const { paymentId } = req.params;
+        const payment = await Payment.findById(paymentId).populate('memberId');
+        
+        if (!payment) {
+            return res.status(404).json({ error: 'Payment not found' });
+        }
+
+        // Create Stripe payment intent
+        const paymentIntent = await stripe.paymentIntents.create({
+            amount: payment.amount * 100, // Convert to cents
+            currency: 'myr',
+            metadata: {
+                paymentId: payment._id.toString()
+            }
+        });
+
+        // Update payment status
+        payment.status = 'Paid';
+        payment.paymentMethod = 'Online';
+        payment.paymentDate = new Date();
+        await payment.save();
+
+        // Send email notification to member
+        const memberEmailHtml = `
+            <p>Dear ${payment.memberId.fullname},</p>
+            <p>Your payment of RM${payment.amount.toFixed(2)} for ${payment.paymentType === 'khairat' ? 'Khairat Fee' : 'Maintenance Fee'} has been received.</p>
+            <p>Payment Details:</p>
+            <ul>
+                <li>Amount: RM${payment.amount.toFixed(2)}</li>
+                <li>Date: ${format(new Date(), 'dd/MM/yyyy')}</li>
+                <li>Reference: ${payment.referenceNumber}</li>
+            </ul>
+            <p>Thank you for your payment.</p>
+            <p>Best regards,<br>The ComCare Team</p>
+        `;
+
+        await sendEmail(
+            payment.memberId.email,
+            'Payment Confirmation',
+            memberEmailHtml
+        );
+
+        // Send email notification to heir
+        const heir = await Dependant.findOne({ 
+            memberId: payment.memberId._id, 
+            isHeir: true 
+        });
+
+        if (heir && heir.heirEmail) {
+            const heirEmailHtml = `
+                <p>Dear ${heir.name},</p>
+                <p>This is to inform you that a payment has been made by ${payment.memberId.fullname}.</p>
+                <p>Payment Details:</p>
+                <ul>
+                    <li>Amount: RM${payment.amount.toFixed(2)}</li>
+                    <li>Type: ${payment.paymentType === 'khairat' ? 'Khairat Fee' : 'Maintenance Fee'}</li>
+                    <li>Date: ${format(new Date(), 'dd/MM/yyyy')}</li>
+                    <li>Reference: ${payment.referenceNumber}</li>
+                </ul>
+                <p>Best regards,<br>The ComCare Team</p>
+            `;
+
+            await sendEmail(
+                heir.heirEmail,
+                'Payment Notification - Member Payment Made',
+                heirEmailHtml
+            );
+        }
+
+        res.json({ 
+            clientSecret: paymentIntent.client_secret,
+            success: true 
+        });
+    } catch (error) {
+        console.error('Error processing payment:', error);
+        res.status(500).json({ error: 'Error processing payment' });
+    }
+};
+
+// Handle Stripe webhook
+exports.handleWebhook = async (req, res) => {
+    const sig = req.headers['stripe-signature'];
+    let event;
+
+    try {
+        event = stripe.webhooks.constructEvent(req.body, sig, process.env.STRIPE_WEBHOOK_SECRET);
+    } catch (err) {
+        console.error('Webhook Error:', err.message);
+        return res.status(400).send(`Webhook Error: ${err.message}`);
+    }
+
+    if (event.type === 'payment_intent.succeeded') {
+        const paymentIntent = event.data.object;
+        const paymentId = paymentIntent.metadata.paymentId;
+
+        try {
+            const payment = await Payment.findById(paymentId).populate('memberId');
+            if (!payment) {
+                throw new Error('Payment not found');
+            }
+
+            // Update payment status
+            payment.status = 'Paid';
+            payment.paymentMethod = 'Online';
+            payment.paymentDate = new Date();
+            await payment.save();
+
+            // Send email notification to member
+            const memberEmailHtml = `
+                <p>Dear ${payment.memberId.fullname},</p>
+                <p>Your payment of RM${payment.amount.toFixed(2)} for ${payment.paymentType === 'khairat' ? 'Khairat Fee' : 'Maintenance Fee'} has been confirmed.</p>
+                <p>Payment Details:</p>
+                <ul>
+                    <li>Amount: RM${payment.amount.toFixed(2)}</li>
+                    <li>Date: ${format(new Date(), 'dd/MM/yyyy')}</li>
+                    <li>Reference: ${payment.referenceNumber}</li>
+                </ul>
+                <p>Thank you for your payment.</p>
+                <p>Best regards,<br>The ComCare Team</p>
+            `;
+
+            await sendEmail(
+                payment.memberId.email,
+                'Payment Confirmation',
+                memberEmailHtml
+            );
+
+            // Send email notification to heir
+            const heir = await Dependant.findOne({ 
+                memberId: payment.memberId._id, 
+                isHeir: true 
+            });
+
+            if (heir && heir.heirEmail) {
+                const heirEmailHtml = `
+                    <p>Dear ${heir.name},</p>
+                    <p>This is to inform you that a payment has been confirmed for ${payment.memberId.fullname}.</p>
+                    <p>Payment Details:</p>
+                    <ul>
+                        <li>Amount: RM${payment.amount.toFixed(2)}</li>
+                        <li>Type: ${payment.paymentType === 'khairat' ? 'Khairat Fee' : 'Maintenance Fee'}</li>
+                        <li>Date: ${format(new Date(), 'dd/MM/yyyy')}</li>
+                        <li>Reference: ${payment.referenceNumber}</li>
+                    </ul>
+                    <p>Best regards,<br>The ComCare Team</p>
+                `;
+
+                await sendEmail(
+                    heir.heirEmail,
+                    'Payment Confirmation - Member Payment Made',
+                    heirEmailHtml
+                );
+            }
+        } catch (error) {
+            console.error('Error processing webhook:', error);
+            return res.status(500).json({ error: 'Error processing webhook' });
+        }
+    }
+
+    res.json({ received: true });
 };

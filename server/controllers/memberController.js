@@ -2,6 +2,7 @@ const Dependant = require("../models/dependant");
 const User = require("../models/user");
 const Payment = require('../models/payment');
 const bcrypt = require('bcrypt');
+const { notifyHeir } = require('../utils/emailer');
 
 
 exports.getMemberList = async (req, res) => {
@@ -512,5 +513,198 @@ exports.deleteMemberDependant = async (req, res) => {
         console.error("Error deleting dependant:", error);
         req.flash("error", "Server error. Please try again later.");
         res.redirect("/memberdependant");
+    }
+};
+
+// Update profile
+exports.updateProfile = async (req, res) => {
+    try {
+        const userId = req.session.user._id;
+        const user = await User.findById(userId);
+        
+        if (!user) {
+            req.flash('error', 'User not found');
+            return res.redirect('/userprofile');
+        }
+
+        // Track changes
+        const changes = [];
+        
+        // Update fields if provided
+        if (req.body.fullname && req.body.fullname !== user.fullname) {
+            user.fullname = req.body.fullname;
+            changes.push(`Name changed to: ${req.body.fullname}`);
+        }
+        if (req.body.phoneNum && req.body.phoneNum !== user.phoneNum) {
+            user.phoneNum = req.body.phoneNum;
+            changes.push(`Phone number changed to: ${req.body.phoneNum}`);
+        }
+        if (req.body.address && req.body.address !== user.address) {
+            user.address = req.body.address;
+            changes.push(`Address changed to: ${req.body.address}`);
+        }
+        if (req.file) {
+            user.profilePicture = '/uploads/profiles/' + req.file.filename;
+            changes.push('Profile picture updated');
+        }
+
+        const updatedUser = await user.save();
+
+        // Notify heir about profile changes
+        if (changes.length > 0) {
+            await notifyHeir(
+                userId,
+                'Member Profile Update Notification',
+                `The profile of ${updatedUser.fullname} has been updated with the following changes:\n${changes.join('\n')}`
+            );
+        }
+
+        req.session.user = {
+            ...req.session.user,
+            fullname: updatedUser.fullname,
+            profilePicture: updatedUser.profilePicture
+        };
+
+        req.flash('success', 'Profile updated successfully');
+        res.redirect('/userprofile');
+    } catch (error) {
+        console.error('Error updating profile:', error);
+        req.flash('error', 'Error updating profile');
+        res.redirect('/userprofile');
+    }
+};
+
+// Add dependant
+exports.addDependant = async (req, res) => {
+    try {
+        const {
+            name,
+            ic,
+            birthday,
+            age,
+            gender,
+            relationship,
+            isHeir,
+            heirEmail
+        } = req.body;
+
+        const memberId = req.session.user._id;
+        const memberName = req.session.user.fullname;
+
+        const dependant = new Dependant({
+            name,
+            ic,
+            birthday,
+            age,
+            gender,
+            relationship,
+            memberId,
+            memberName,
+            isHeir: isHeir === 'true' || isHeir === true,
+            heirEmail: isHeir === 'true' || isHeir === true ? heirEmail : undefined
+        });
+
+        await dependant.save();
+
+        // Notify heir about new dependant
+        if (!isHeir) {
+            await notifyHeir(
+                memberId,
+                'New Dependant Added',
+                `${memberName} has added a new dependant: ${name} (${relationship})`
+            );
+        }
+
+        req.flash('success', 'Dependant added successfully');
+        res.redirect('/dependants');
+    } catch (error) {
+        console.error('Error adding dependant:', error);
+        req.flash('error', 'Error adding dependant');
+        res.redirect('/dependants');
+    }
+};
+
+// Update dependant
+exports.updateDependant = async (req, res) => {
+    try {
+        const {
+            name,
+            ic,
+            birthday,
+            age,
+            gender,
+            relationship,
+            isHeir,
+            heirEmail
+        } = req.body;
+
+        const dependant = await Dependant.findById(req.params.id);
+        if (!dependant) {
+            req.flash('error', 'Dependant not found');
+            return res.redirect('/dependants');
+        }
+
+        // Track changes
+        const changes = [];
+        if (name !== dependant.name) changes.push(`Name changed to: ${name}`);
+        if (relationship !== dependant.relationship) changes.push(`Relationship changed to: ${relationship}`);
+        if (isHeir !== dependant.isHeir) changes.push(`Heir status changed to: ${isHeir === 'true' || isHeir === true ? 'Yes' : 'No'}`);
+
+        dependant.name = name;
+        dependant.ic = ic;
+        dependant.birthday = birthday;
+        dependant.age = age;
+        dependant.gender = gender;
+        dependant.relationship = relationship;
+        dependant.isHeir = isHeir === 'true' || isHeir === true;
+        dependant.heirEmail = isHeir === 'true' || isHeir === true ? heirEmail : undefined;
+
+        await dependant.save();
+
+        // Notify heir about dependant changes
+        if (changes.length > 0) {
+            await notifyHeir(
+                dependant.memberId,
+                'Dependant Information Updated',
+                `The following changes were made to dependant ${name}:\n${changes.join('\n')}`
+            );
+        }
+
+        req.flash('success', 'Dependant updated successfully');
+        res.redirect('/dependants');
+    } catch (error) {
+        console.error('Error updating dependant:', error);
+        req.flash('error', 'Error updating dependant');
+        res.redirect('/dependants');
+    }
+};
+
+// Delete dependant
+exports.deleteDependant = async (req, res) => {
+    try {
+        const dependant = await Dependant.findById(req.params.id);
+        if (!dependant) {
+            req.flash('error', 'Dependant not found');
+            return res.redirect('/dependants');
+        }
+
+        const memberId = dependant.memberId;
+        const dependantName = dependant.name;
+
+        await Dependant.findByIdAndDelete(req.params.id);
+
+        // Notify heir about dependant deletion
+        await notifyHeir(
+            memberId,
+            'Dependant Removed',
+            `The dependant ${dependantName} has been removed from the system.`
+        );
+
+        req.flash('success', 'Dependant deleted successfully');
+        res.redirect('/dependants');
+    } catch (error) {
+        console.error('Error deleting dependant:', error);
+        req.flash('error', 'Error deleting dependant');
+        res.redirect('/dependants');
     }
 };
