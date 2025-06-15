@@ -32,6 +32,9 @@ console.log('SMTP_PASSWORD:', env.SMTP_PASSWORD ? '******' : 'Not set');
 
 const app = express();
 
+// Trust the first proxy (Render's proxy)
+app.set('trust proxy', 1);
+
 // Basic middleware
 app.use(express.urlencoded({ extended: true }));
 app.use(express.json());
