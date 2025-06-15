@@ -100,14 +100,14 @@ router.get("/adminprofile", isAuthenticated, isAdmin, async (req, res) => {
             return res.redirect('/admindashboard');
         }
 
-        res.render("adminprofile", {
+    res.render("adminprofile", {
             user,
-            csrfToken: req.csrfToken(),
-            messages: {
-                error: req.flash('error'),
-                success: req.flash('success')
-            }
-        });
+        csrfToken: req.csrfToken(),
+        messages: {
+            error: req.flash('error'),
+            success: req.flash('success')
+        }
+    });
     } catch (error) {
         console.error("Error fetching admin profile:", error);
         req.flash('error', 'Error fetching admin profile.');
@@ -211,5 +211,13 @@ router.get("/api/members", isAuthenticated, async (req, res) => {
 
 // Receipt Route
 router.get('/receipt/:id', isAuthenticated, paymentController.viewReceipt);
+
+// Forgot Password Route
+router.post("/forgot-password", require("../controllers/authController").forgotPassword);
+
+// Reset Password Routes
+const authController = require("../controllers/authController");
+router.get("/reset-password", authController.resetPasswordPage);
+router.post("/reset-password", authController.resetPassword);
 
 module.exports = router;

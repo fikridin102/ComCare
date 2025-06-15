@@ -1,6 +1,89 @@
-<%- include('include/header') %>
-<body class="flex justify-center items-center h-screen bg-cover bg-center" style="background-image: url('/assets/images/background.jpg');">
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <%- include('include/header') %>
+    <title>Login - ComCare</title>
+</head>
+<body class="flex justify-center items-center h-screen bg-cover bg-center"
+      style="background-image: url('/assets/images/background.jpg');"
+      x-data="{
+        showForgotPasswordModal: false,
+        showSuccessPopup: false,
+        showErrorPopup: false,
+        errorMessage: '',
+        email: '',
+        showSuccess(message) {
+          this.errorMessage = message;
+          this.showSuccessPopup = true;
+          this.showErrorPopup = false;
+          setTimeout(() => { this.showSuccessPopup = false; }, 3000);
+        },
+        showError(message) {
+          this.errorMessage = message;
+          this.showErrorPopup = true;
+          setTimeout(() => { this.showErrorPopup = false; }, 3000);
+        },
+        async sendResetEmail() {
+          try {
+            const response = await fetch('/forgot-password', {
+              method: 'POST',
+              headers: {
+                'Content-Type': 'application/json',
+                'X-CSRF-Token': document.querySelector('input[name=\'_csrf\']').value,
+                'Accept': 'application/json'
+              },
+              body: JSON.stringify({ email: this.email })
+            });
+            const data = await response.json();
+            if (response.ok) {
+              this.showSuccess(data.message);
+              this.showForgotPasswordModal = false;
+              this.email = '';
+            } else {
+              this.showError(data.message || 'Failed to send password reset email.');
+            }
+          } catch (error) {
+            console.error('Error sending reset email:', error);
+            this.showError('An unexpected error occurred.');
+          }
+        }
+      }">
 
+    <!-- Success Popup -->
+    <div x-show="showSuccessPopup"
+         x-transition:enter="transition ease-out duration-300"
+         x-transition:enter-start="opacity-0 transform scale-90"
+         x-transition:enter-end="opacity-100 transform scale-100"
+         x-transition:leave="transition ease-in duration-300"
+         x-transition:leave-start="opacity-100 transform scale-100"
+         x-transition:leave-end="opacity-0 transform scale-90"
+         class="fixed top-4 left-1/2 transform -translate-x-1/2 bg-green-500 text-white px-6 py-3 rounded-lg shadow-lg"
+         style="z-index: 99999 !important;">
+        <div class="flex items-center">
+            <svg class="w-6 h-6 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 13l4 4L19 7"></path>
+            </svg>
+            <span x-text="errorMessage"></span>
+        </div>
+    </div>
+
+    <!-- Error Popup -->
+    <div x-show="showErrorPopup"
+         x-transition:enter="transition ease-out duration-300"
+         x-transition:enter-start="opacity-0 transform scale-90"
+         x-transition:enter-end="opacity-100 transform scale-100"
+         x-transition:leave="transition ease-in duration-300"
+         x-transition:leave-start="opacity-100 transform scale-100"
+         x-transition:leave-end="opacity-0 transform scale-90"
+         class="fixed top-4 left-1/2 transform -translate-x-1/2 bg-red-500 text-white px-6 py-3 rounded-lg shadow-lg"
+         style="z-index: 99999 !important;">
+        <div class="flex items-center">
+            <svg class="w-6 h-6 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"></path>
+            </svg>
+            <span x-text="errorMessage"></span>
+        </div>
+    </div>
 
     <div class="w-96 bg-white shadow-lg rounded-lg p-6">
         <div class="text-xl font-semibold mb-4 text-center">Login</div>
@@ -48,7 +131,33 @@
             Don't have an account? 
             <a href="/register" class="text-blue-500 hover:underline">Register</a>
         </p>
+        <p class="text-sm text-center mt-2">
+            <a href="#" @click.prevent="showForgotPasswordModal = true" class="text-blue-500 hover:underline">Forgot Password?</a>
+        </p>
     </div>
+
+    <!-- Forgot Password Modal -->
+    <template x-if="showForgotPasswordModal" x-cloak>
+        <div class="fixed inset-0 flex items-center justify-center bg-black bg-opacity-50">
+            <div class="bg-white p-6 rounded-lg shadow-lg w-96">
+                <h2 class="text-lg font-semibold text-center mb-4">Forgot Password</h2>
+                <form @submit.prevent="sendResetEmail()">
+                    <input type="hidden" name="_csrf" value="<%= csrfToken %>">
+                    <div class="mb-4">
+                        <label for="forgotPasswordEmail" class="block text-sm font-medium text-gray-700">Enter your email address</label>
+                        <input type="email" id="forgotPasswordEmail" x-model="email" 
+                               class="mt-1 block w-full p-2 border border-gray-300 rounded-md shadow-sm focus:ring-blue-500 focus:border-blue-500" required>
+                    </div>
+                    <div class="flex justify-end gap-2">
+                        <button type="button" @click="showForgotPasswordModal = false" 
+                                class="bg-red-500 text-white px-4 py-2 rounded-md hover:bg-red-600 transition-colors duration-200">Cancel</button>
+                        <button type="submit" 
+                                class="bg-blue-500 text-white px-4 py-2 rounded-md hover:bg-blue-600 transition-colors duration-200">Send Reset Link</button>
+                    </div>
+                </form>
+            </div>
+        </div>
+    </template>
 
 </body>
 <%- include('include/footer') %>

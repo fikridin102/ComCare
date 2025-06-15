@@ -39,7 +39,7 @@ function adminDependant() {
                 if (!value) {
                     this.resetForm();
                 }
-            });
+                });
         },
 
         calculateAge(birthday) {

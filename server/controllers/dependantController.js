@@ -174,7 +174,7 @@ exports.addDependant = async (req, res) => {
                 console.error('Member already has an heir');
                 req.flash('error', 'Member already has an heir');
                 return res.redirect('/admindependant');
-            }
+        }
         }
 
         console.log('Creating new dependant...');
@@ -324,7 +324,7 @@ exports.updateDependant = async (req, res) => {
             if (existingHeir) {
                 req.flash('error', 'Member already has an heir. Please remove the existing heir first.');
                 return res.redirect('/admindependant');
-            }
+        }
         }
 
         // Track changes for notification
@@ -371,7 +371,7 @@ exports.updateDependant = async (req, res) => {
                     <p>Best regards,<br>The ComCare Team</p>
                 `;
                 await sendEmail(dependant.heirEmail, heirSubject, heirHtml);
-            }
+        }
         }
 
         req.flash('success', 'Dependant updated successfully');
