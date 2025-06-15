@@ -43,7 +43,7 @@ app.use(morgan("tiny"));
 
 // Setup sessions (necessary for CSRF)
 app.use(session({
-    secret: "secret123",
+    secret: process.env.JWT_SECRET,
     resave: false,
     saveUninitialized: true,
     cookie: { 
@@ -57,8 +57,7 @@ app.use(session({
 app.use(flash());
 
 // Setup CSRF Protection globally (for res.locals.csrfToken)
-// const csrfProtection = csrf({ cookie: false, debug: true }); // Added debug: true
-// app.use(csrfProtection);
+// The csrfDebugMiddleware will internally apply csurf and log
 app.use(csrfDebugMiddleware);
 
 // Pass CSRF Token and messages to all views
@@ -104,13 +103,19 @@ app.get('/csrf-token', (req, res) => {
     res.json({ csrfToken: req.csrfToken() });
 });
 
-// Error handler for CSRF token errors
+// Error handler for CSRF token errors (MUST be after session and csurf middleware)
 app.use((err, req, res, next) => {
     if (err.code === 'EBADCSRFTOKEN') {
-        // Handle CSRF token errors
-        req.flash('error', 'Invalid CSRF token. Please try again.');
+        console.error('CSRF Token Error:', err.message); // Log the specific error
+        // If the request expects JSON (e.g., AJAX call), send JSON error
+        if (req.accepts('json')) {
+            return res.status(403).json({ success: false, message: 'Invalid CSRF token. Please refresh the page and try again.' });
+        }
+        // Otherwise, redirect for traditional form submissions
+        req.flash('error', 'Invalid CSRF token. Please refresh the page and try again.');
         return res.redirect('back');
     }
+    // Pass other errors to the next error handler
     next(err);
 });
 

@@ -83,6 +83,9 @@ router.post("/memberpayment", isAuthenticated, isMember, csrfDebugMiddleware, pa
 router.post("/create-payment-intent", isAuthenticated, isMember, csrfDebugMiddleware, paymentController.createPaymentIntent);
 router.get("/payment-success", isAuthenticated, isMember, paymentController.handlePaymentSuccess);
 
+// Password change route
+router.post("/change-password", isAuthenticated, csrfDebugMiddleware, memberController.changePassword);
+
 // Member Claim Routes
 router.get("/memberclaim", isAuthenticated, isMember, claimController.getClaimPage);
 router.post("/memberclaim", isAuthenticated, isMember, csrfDebugMiddleware, claimController.submitClaim);

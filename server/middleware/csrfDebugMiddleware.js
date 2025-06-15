@@ -1,31 +1,29 @@
-const csrf = require('csurf');
+const csurf = require('csurf');
 
-const csrfProtection = csrf({ cookie: false });
+// Create the CSRF protection middleware instance
+const csrfProtection = csurf({ cookie: true });
 
-const csrfDebugMiddleware = (req, res, next) => {
+function csrfDebugMiddleware(req, res, next) {
+    // Log all headers for debugging
     console.log('=== CSRF Debug ===');
     console.log('Request Method:', req.method);
-    console.log('Request URL:', req.url);
+    console.log('Request URL:', req.originalUrl);
     console.log('Request Headers:', req.headers);
-    console.log('Request Body (before csurf):', req.body);
+    console.log('Request Body (before csurf):', req.body); // body might be empty/parsed here
     console.log('Session:', req.session);
-    console.log('CSRF Secret:', req.session.csrfSecret);
-    console.log('CSRF Token (from body):', req.body._csrf);
+    console.log('CSRF Secret (from session):', req.session.csrfSecret); // Access secret from session
+    console.log('CSRF Token (from header):', req.headers['x-csrf-token']); // Check header
+    console.log('CSRF Token (from body):', req.body._csrf); // Check body
     console.log('==================');
 
-    if (req.method === 'POST' && req.headers['content-type'] && req.headers['content-type'].startsWith('multipart/form-data')) {
-        console.log('Skipping global CSRF check for multipart/form-data POST request. Calling next().');
+    // Exclude Stripe webhook and multipart/form-data from CSRF protection
+    if (req.originalUrl === '/webhook' || req.is('multipart/form-data')) {
+        console.log('Skipping CSRF protection for:', req.originalUrl);
         return next();
     }
 
-    console.log('Executing csrfProtection for non-multipart/form-data or non-POST request.');
-    csrfProtection(req, res, (err) => {
-        if (err) {
-            console.error('CSRF Error:', err);
-            return next(err);
-        }
-        next();
-    });
-};
+    // Apply actual CSRF protection
+    csrfProtection(req, res, next);
+}
 
 module.exports = csrfDebugMiddleware; 

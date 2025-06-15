@@ -589,58 +589,141 @@ exports.deleteMemberDependant = async (req, res) => {
 // Update profile
 exports.updateProfile = async (req, res) => {
     try {
-        const userId = req.session.user._id;
+        // 1. Get user ID from session and find the user
+        const userId = req.session.user.id; // Correctly get ID from session
+        if (!userId) {
+            return res.status(401).json({
+                success: false,
+                message: 'Unauthorized: User ID not found in session.'
+            });
+        }
+
         const user = await User.findById(userId);
-        
         if (!user) {
-            req.flash('error', 'User not found');
-            return res.redirect('/userprofile');
+            return res.status(404).json({
+                success: false,
+                message: 'User not found.'
+            });
         }
 
-        // Track changes
+        // 2. Extract data from request body
+        const { username, fullname, email, birthDate, phoneNum, address } = req.body;
+
+        // 3. Track changes for heir notification and response
         const changes = [];
-        
-        // Update fields if provided
-        if (req.body.fullname && req.body.fullname !== user.fullname) {
-            user.fullname = req.body.fullname;
-            changes.push(`Name changed to: ${req.body.fullname}`);
-        }
-        if (req.body.phoneNum && req.body.phoneNum !== user.phoneNum) {
-            user.phoneNum = req.body.phoneNum;
-            changes.push(`Phone number changed to: ${req.body.phoneNum}`);
-        }
-        if (req.body.address && req.body.address !== user.address) {
-            user.address = req.body.address;
-            changes.push(`Address changed to: ${req.body.address}`);
-        }
-        if (req.file) {
-            user.profilePicture = '/uploads/profiles/' + req.file.filename;
-            changes.push('Profile picture updated');
+        const updatedFields = {}; // Object to hold fields that actually changed
+
+        // 4. Validate and update each field, tracking changes
+
+        // Username
+        if (username !== undefined && username !== user.username) {
+            const existingUser = await User.findOne({ username: username, _id: { $ne: userId } });
+            if (existingUser) {
+                return res.status(400).json({
+                    success: false,
+                    message: 'Username is already taken.'
+                });
+            }
+            user.username = username;
+            updatedFields.username = username;
+            changes.push(`Username changed from '${req.session.user.username}' to '${username}'`);
         }
 
-        const updatedUser = await user.save();
-
-        // Notify heir about profile changes
-        if (changes.length > 0) {
-            await notifyHeir(
-                userId,
-                'Member Profile Update Notification',
-                `The profile of ${updatedUser.fullname} has been updated with the following changes:\n${changes.join('\n')}`
-            );
+        // Full Name
+        if (fullname !== undefined && fullname !== user.fullname) {
+            user.fullname = fullname;
+            updatedFields.fullname = fullname;
+            changes.push(`Full Name changed from '${req.session.user.fullname}' to '${fullname}'`);
         }
 
-        req.session.user = {
-            ...req.session.user,
-            fullname: updatedUser.fullname,
-            profilePicture: updatedUser.profilePicture
-        };
+        // Email
+        if (email !== undefined && email !== user.email) {
+            const existingUser = await User.findOne({ email: email, _id: { $ne: userId } });
+            if (existingUser) {
+                return res.status(400).json({
+                    success: false,
+                    message: 'Email is already taken.'
+                });
+            }
+            user.email = email;
+            updatedFields.email = email;
+            changes.push(`Email changed from '${req.session.user.email}' to '${email}'`);
+        }
 
-        req.flash('success', 'Profile updated successfully');
-        res.redirect('/userprofile');
+        // Birth Date & Age
+        if (birthDate !== undefined && birthDate !== user.birthDate) {
+            const newBirthDate = new Date(birthDate);
+            const today = new Date();
+            let newAge = today.getFullYear() - newBirthDate.getFullYear();
+            const monthDiff = today.getMonth() - newBirthDate.getMonth();
+            if (monthDiff < 0 || (monthDiff === 0 && today.getDate() < newBirthDate.getDate())) {
+                newAge--;
+            }
+            user.birthDate = newBirthDate;
+            user.age = newAge;
+            updatedFields.birthDate = birthDate; // Send back as ISO string
+            updatedFields.age = newAge;
+            changes.push(`Birth Date changed to: ${birthDate} (Age: ${newAge})`);
+        }
+
+        // Phone Number
+        if (phoneNum !== undefined && phoneNum !== user.phoneNum) {
+            user.phoneNum = phoneNum;
+            updatedFields.phoneNum = phoneNum;
+            changes.push(`Phone Number changed from '${req.session.user.phoneNum}' to '${phoneNum}'`);
+        }
+
+        // Address
+        if (address !== undefined && address !== user.address) {
+            user.address = address;
+            updatedFields.address = address;
+            changes.push(`Address changed from '${req.session.user.address}' to '${address}'`);
+        }
+
+        // If no changes were made, return early
+        if (changes.length === 0) {
+            return res.status(200).json({
+                success: true,
+                message: 'No changes were detected.',
+                user: req.session.user // Return current session user data
+            });
+        }
+
+        // 5. Save the updated user
+        await user.save();
+
+        // 6. Update session with the latest user data (critical for frontend to reflect changes)
+        // We only update fields that were sent and changed to avoid overwriting other session data
+        req.session.user = { ...req.session.user, ...updatedFields };
+
+        // 7. Notify heir
+        await notifyHeir(
+            userId,
+            'Member Profile Update Notification',
+            `The profile of ${user.fullname} (${user.username}) has been updated with the following changes:\n- ${changes.join('\n- ')}`
+        );
+
+        // 8. Send success response
+        return res.status(200).json({
+            success: true,
+            message: 'Profile updated successfully!',
+            user: req.session.user // Send back the updated session user data
+        });
+
     } catch (error) {
         console.error('Error updating profile:', error);
-        req.flash('error', 'Error updating profile');
-        res.redirect('/userprofile');
+        // Handle Mongoose validation errors or other server errors
+        if (error.name === 'ValidationError') {
+            const messages = Object.values(error.errors).map(val => val.message);
+            return res.status(400).json({
+                success: false,
+                message: messages.join('; ')
+            });
+        }
+        return res.status(500).json({
+            success: false,
+            message: 'An error occurred while updating profile. Please try again.'
+        });
     }
 };
 
@@ -776,5 +859,98 @@ exports.deleteDependant = async (req, res) => {
         console.error('Error deleting dependant:', error);
         req.flash('error', 'Error deleting dependant');
         res.redirect('/dependants');
+    }
+};
+
+// Change password
+exports.changePassword = async (req, res) => {
+    try {
+        const { currentPassword, newPassword, confirmPassword } = req.body;
+        
+        // Check if user is logged in
+        if (!req.session.user) {
+            return res.status(401).json({
+                success: false,
+                message: 'Please log in to change your password'
+            });
+        }
+
+        // Get user ID from session
+        const userId = req.session.user.id;
+        if (!userId) {
+            console.error('No user ID found in session');
+            return res.status(401).json({
+                success: false,
+                message: 'Session error. Please log in again.'
+            });
+        }
+
+        // Input validation
+        if (!currentPassword || !newPassword || !confirmPassword) {
+            return res.status(400).json({
+                success: false,
+                message: 'All password fields are required'
+            });
+        }
+
+        // Validate passwords match
+        if (newPassword !== confirmPassword) {
+            return res.status(400).json({
+                success: false,
+                message: 'New passwords do not match'
+            });
+        }
+
+        // Find user
+        const user = await User.findById(userId);
+        if (!user) {
+            console.error('User not found with ID:', userId);
+            return res.status(404).json({
+                success: false,
+                message: 'User not found'
+            });
+        }
+
+        // Verify current password
+        const isMatch = await bcrypt.compare(currentPassword, user.password);
+        if (!isMatch) {
+            return res.status(400).json({
+                success: false,
+                message: 'Current password is incorrect'
+            });
+        }
+
+        // Hash new password
+        const hashedPassword = await bcrypt.hash(newPassword, 10);
+
+        // Update password
+        user.password = hashedPassword;
+        await user.save();
+
+        // Send email notification
+        const subject = 'Password Changed Successfully';
+        const html = `
+            <p>Dear ${user.fullname},</p>
+            <p>Your password has been changed successfully.</p>
+            <p>If you did not make this change, please contact us immediately.</p>
+            <p>Best regards,<br>The ComCare Team</p>
+        `;
+        await sendEmail(user.email, subject, html);
+
+        // Notify heir about password change
+        await notifyHeir(userId, 'Password Change Notification', 
+            `${user.fullname}'s account password has been changed.`);
+
+        // Return success response
+        return res.status(200).json({
+            success: true,
+            message: 'Password changed successfully'
+        });
+    } catch (error) {
+        console.error('Error changing password:', error);
+        return res.status(500).json({
+            success: false,
+            message: 'An error occurred while changing password'
+        });
     }
 };
