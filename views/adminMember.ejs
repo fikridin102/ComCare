@@ -33,48 +33,34 @@
                                 </tr>
                             </thead>
                             <tbody>
-                                <% if (members.length > 0) { %>
-                                    <% for(var i=0; i<members.length; i++) { %>
-                                        <tr>
-                                            <td class="border border-gray-300 px-4 py-2"><%= i + 1 %></td>
-                                            <td class="border border-gray-300 px-4 py-2 font-mono"><%= members[i].customId || 'N/A' %></td>
-                                            <td class="border border-gray-300 px-4 py-2"><%= members[i].fullname %></td>
-                                            <td class="border border-gray-300 px-4 py-2"><%= members[i].icNum %></td>
-                                            <td class="border border-gray-300 px-4 py-2"><%= new Date(members[i].birthDate).toLocaleDateString('en-MY', { day: '2-digit', month: '2-digit', year: 'numeric' }) %></td>
-                                            <td class="border border-gray-300 px-4 py-2"><%= members[i].age %></td>
-                                            <td class="border border-gray-300 px-4 py-2"><%= members[i].address %></td>
-                                            <td class="border border-gray-300 px-4 py-2"><%= members[i].phoneNum %></td>
-                                            <td class="border border-gray-300 px-4 py-2">
-                                                <span class="px-2 py-1 rounded-full text-sm <%= members[i].status === 'Active' ? 'bg-green-100 text-green-800' : 'bg-red-100 text-red-800' %>">
-                                                    <%= members[i].status %>
-                                                </span>
-                                            </td>
-                                            <td class="border border-gray-300 px-4 py-2 text-center">
-                                                <button @click="openEditModal({ 
-                                                    _id: '<%= members[i]._id %>',
-                                                    customId: '<%= members[i].customId %>',
-                                                    fullname: '<%= members[i].fullname %>',
-                                                    username: '<%= members[i].username %>',
-                                                    email: '<%= members[i].email %>',
-                                                    icNum: '<%= members[i].icNum %>',
-                                                    birthDate: '<%= members[i].birthDate %>',
-                                                    phoneNum: '<%= members[i].phoneNum %>',
-                                                    address: '<%= members[i].address %>',
-                                                    status: '<%= members[i].status %>'
-                                                })" class="hover:opacity-75">
-                                                    <img src="/assets/images/edit.png" class="w-5 h-5">
-                                                </button>
-                                                <button @click="openDeleteModal('<%= members[i]._id %>')" class="hover:opacity-75">
-                                                    <img src="/assets/images/delete.png" class="w-5 h-5">
-                                                </button>
-                                            </td>
-                                        </tr>
-                                    <% } %>
-                                <% } else { %>
+                                <template x-for="(member, index) in filteredMembers" :key="member._id">
                                     <tr>
-                                        <td colspan="10" class="text-center border border-gray-300 px-4 py-2">No members found.</td>
+                                        <td class="border border-gray-300 px-4 py-2" x-text="index + 1"></td>
+                                        <td class="border border-gray-300 px-4 py-2 font-mono" x-text="member.customId || 'N/A'"></td>
+                                        <td class="border border-gray-300 px-4 py-2" x-text="member.fullname"></td>
+                                        <td class="border border-gray-300 px-4 py-2" x-text="member.icNum"></td>
+                                        <td class="border border-gray-300 px-4 py-2" x-text="formatDate(member.birthDate)"></td>
+                                        <td class="border border-gray-300 px-4 py-2" x-text="member.age"></td>
+                                        <td class="border border-gray-300 px-4 py-2" x-text="member.address"></td>
+                                        <td class="border border-gray-300 px-4 py-2" x-text="member.phoneNum"></td>
+                                        <td class="border border-gray-300 px-4 py-2">
+                                            <span class="px-2 py-1 rounded-full text-sm" :class="member.status === 'Active' ? 'bg-green-100 text-green-800' : 'bg-red-100 text-red-800'">
+                                                <span x-text="member.status"></span>
+                                            </span>
+                                        </td>
+                                        <td class="border border-gray-300 px-4 py-2 text-center">
+                                            <button @click="openEditModal(member)" class="hover:opacity-75">
+                                                <img src="/assets/images/edit.png" class="w-5 h-5">
+                                            </button>
+                                            <button @click="openDeleteModal(member._id)" class="hover:opacity-75">
+                                                <img src="/assets/images/delete.png" class="w-5 h-5">
+                                            </button>
+                                        </td>
                                     </tr>
-                                <% } %>
+                                </template>
+                                <tr x-show="filteredMembers.length === 0">
+                                    <td colspan="10" class="text-center border border-gray-300 px-4 py-2">No members found.</td>
+                                </tr>
                             </tbody>
                         </table>
                     </div>
@@ -238,6 +224,11 @@
             </div>
         </template>
     </div>
+
+    <!-- New script tag to safely pass members data -->
+    <script id="raw-members-json" type="application/json">
+        <%- JSON.stringify(members || []) %>
+    </script>
 
     <!-- Add Alpine.js and adminMember.js -->
     <script src="/js/adminMember.js"></script>

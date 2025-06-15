@@ -63,24 +63,44 @@ exports.getAdminDependants = async (req, res) => {
 // Get all dependants (admin view)
 exports.getAllDependants = async (req, res) => {
     try {
+        console.log('=== Starting getAllDependants ===');
+        
+        // Find all dependants and populate member information
         const dependants = await Dependant.find()
             .populate('memberId', 'username fullname')
-            .sort({ createdAt: -1 });
+            .lean();
             
+        // Transform the data for the view
         const formattedDependants = dependants.map(dependant => ({
-            _id: dependant._id,
+            _id: dependant._id.toString(),
             name: dependant.name,
             ic: dependant.ic,
-            birthday: dependant.birthday,
+            birthday: dependant.birthday ? new Date(dependant.birthday).toISOString().split('T')[0] : null,
             age: dependant.age,
             gender: dependant.gender,
             relationship: dependant.relationship,
-            memberId: dependant.memberId._id,
-            memberName: dependant.memberId.fullname || dependant.memberId.username
+            memberId: dependant.memberId ? dependant.memberId._id.toString() : null,
+            memberName: dependant.memberId ? (dependant.memberId.fullname || dependant.memberId.username) : 'Unknown'
         }));
 
+        // Get all members for the dropdown
+        const members = await User.find({ userType: "member" })
+            .select('_id fullname username')
+            .lean();
+
+        // Transform members data
+        const formattedMembers = members.map(member => ({
+            _id: member._id.toString(),
+            fullname: member.fullname || member.username
+        }));
+
+        console.log('Found dependants:', JSON.stringify(formattedDependants, null, 2));
+        console.log('Found members:', JSON.stringify(formattedMembers, null, 2));
+
+        // Render the page with the data
         res.render("adminDependant", {
             dependants: formattedDependants,
+            members: formattedMembers,
             user: req.session.user,
             csrfToken: req.csrfToken(),
             messages: {
@@ -88,8 +108,10 @@ exports.getAllDependants = async (req, res) => {
                 error: req.flash('error')
             }
         });
+        
+        console.log('=== Finished getAllDependants ===');
     } catch (err) {
-        console.error("Error fetching dependants:", err);
+        console.error("Error in getAllDependants:", err);
         req.flash("error", "Error retrieving dependants list");
         res.redirect("/admindashboard");
     }

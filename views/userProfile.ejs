@@ -180,6 +180,10 @@
                                 showEditModal = false;
                                 // Update the displayed values
                                 Object.assign(user, data.user);
+                                // Reload the page after a short delay
+                                setTimeout(() => {
+                                    window.location.reload();
+                                }, 1000);
                             } else {
                                 showError(data.message || 'Failed to update profile');
                             }
@@ -238,6 +242,11 @@
                 <div class="bg-white p-4 rounded-lg shadow-lg w-1/3 mx-auto">
                     <h2 class="text-lg font-semibold mb-4 text-center">Change Password</h2>
                     <form @submit.prevent="
+                        if ($refs.newPassword.value === $refs.currentPassword.value) {
+                            showError('New password cannot be the same as the current password.');
+                            return;
+                        }
+
                         fetch('/change-password', {
                             method: 'POST',
                             headers: {

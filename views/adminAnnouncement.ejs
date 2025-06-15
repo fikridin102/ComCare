@@ -13,7 +13,7 @@
                 <div class="text-xl font-semibold mb-4 text-center">Announcement List</div>
 
                 <div class="mb-4">
-                    <input type="text" class="border border-gray-300 w-full p-2 rounded" placeholder="Search by Announcement ID or Name" x-model="search">
+                    <input type="text" class="border border-gray-300 w-full p-2 rounded" placeholder="Search by Announcement ID or Name" @input="search = $event.target.value; console.log('Search input value (updated): ', search)">
                 </div>
 
                 <div class="overflow-x-auto">
@@ -30,42 +30,34 @@
                             </tr>
                         </thead>
                         <tbody>
-                            <% if (announcements.length > 0) { %>
-                                <% for(var i=0; i<announcements.length; i++) { %>
-                                    <tr>
-                                        <td class="border border-gray-300 px-4 py-2"><%= i + 1 %></td>
-                                        <td class="border border-gray-300 px-4 py-2 font-mono"><%= announcements[i].announcementId %></td>
-                                        <td class="border border-gray-300 px-4 py-2"><%= announcements[i].title %></td>
-                                        <td class="border border-gray-300 px-4 py-2"><%= announcements[i].content %></td>
-                                        <td class="border border-gray-300 px-4 py-2 text-center">
-                                            <% if (announcements[i].image) { %>
-                                                <img src="<%= announcements[i].image %>" alt="Announcement Image" style="max-width: 80px; max-height: 60px; border-radius: 4px;" />
-                                            <% } else { %>
-                                                <span class="text-gray-400">No image</span>
-                                            <% } %>
-                                        </td>
-                                        <td class="border border-gray-300 px-4 py-2"><%= new Date(announcements[i].date).toLocaleDateString() %></td>
-                                        <td class="border border-gray-300 px-4 py-2 text-center">
-                                                <button @click="showModal = true; modalType = 'edit'; announcement = { 
-                                                _id: '<%= announcements[i]._id %>',
-                                                announcementId: '<%= announcements[i].announcementId %>',
-                                                title: '<%= announcements[i].title %>',
-                                                    content: '<%= announcements[i].content %>',
-                                                    image: '<%= announcements[i].image || '' %>'
-                                                }">
-                                                <img src="/assets/images/edit.png" class="w-5 h-5">
-                                            </button>
-                                                <button @click="showDeleteModal = true; deleteAnnouncementId = '<%= announcements[i]._id %>'">
-                                                <img src="/assets/images/delete.png" class="w-5 h-5">
-                                            </button>
-                                        </td>
-                                    </tr>
-                                <% } %>
-                            <% } else { %>
+                            <template x-for="(announcement, index) in filteredAnnouncements" :key="announcement._id">
                                 <tr>
-                                        <td colspan="7" class="text-center border border-gray-300 px-4 py-2">No announcements found.</td>
+                                    <td class="border border-gray-300 px-4 py-2" x-text="index + 1"></td>
+                                    <td class="border border-gray-300 px-4 py-2 font-mono" x-text="announcement.announcementId"></td>
+                                    <td class="border border-gray-300 px-4 py-2" x-text="announcement.title"></td>
+                                    <td class="border border-gray-300 px-4 py-2" x-text="announcement.content"></td>
+                                    <td class="border border-gray-300 px-4 py-2 text-center">
+                                        <template x-if="announcement.image">
+                                            <img :src="announcement.image" alt="Announcement Image" style="max-width: 80px; max-height: 60px; border-radius: 4px;" />
+                                        </template>
+                                        <template x-if="!announcement.image">
+                                            <span class="text-gray-400">No image</span>
+                                        </template>
+                                    </td>
+                                    <td class="border border-gray-300 px-4 py-2" x-text="new Date(announcement.date).toLocaleDateString()"></td>
+                                    <td class="border border-gray-300 px-4 py-2 text-center">
+                                        <button @click="console.log('Edit button clicked for ID:', announcement._id); openEditModal(announcement._id)">
+                                            <img src="/assets/images/edit.png" class="w-5 h-5">
+                                        </button>
+                                        <button @click="showDeleteModal = true; deleteAnnouncementId = announcement._id">
+                                            <img src="/assets/images/delete.png" class="w-5 h-5">
+                                        </button>
+                                    </td>
                                 </tr>
-                            <% } %>
+                            </template>
+                            <tr x-show="filteredAnnouncements.length === 0">
+                                <td colspan="7" class="text-center border border-gray-300 px-4 py-2">No announcements found.</td>
+                            </tr>
                         </tbody>
                     </table>
                 </div>
@@ -84,29 +76,45 @@
         <template x-if="showModal && modalType === 'add'" x-cloak>
             <div class="fixed inset-0 flex items-center justify-center bg-black bg-opacity-50">
                 <div class="bg-white p-6 rounded-lg shadow-lg w-1/3">
-                    <form action="/adminannouncement" method="POST" enctype="multipart/form-data" @submit="console.log('Add form submitted:', $event.target)">
+                    <form @submit.prevent="
+                        const formData = new FormData($event.target);
+                        fetch('/adminannouncement', {
+                            method: 'POST',
+                            headers: {
+                                'X-CSRF-Token': '<%= csrfToken %>',
+                                'Accept': 'application/json'
+                            },
+                            body: formData
+                        })
+                        .then(response => {
+                            if (!response.ok) {
+                                throw new Error('Network response was not ok');
+                            }
+                            window.location.reload();
+                        })
+                        .catch(error => {
+                            console.error('Error:', error);
+                            alert('An error occurred while adding the announcement');
+                        })">
                         <input type="hidden" name="_csrf" value="<%= csrfToken %>">
                         <h2 class="text-lg font-semibold text-center mb-4">Add Announcement</h2>
                         
                         <div class="mb-4">
                             <label class="block text-sm font-medium text-gray-700">Title</label>
                             <input type="text" name="title" placeholder="Enter title" 
-                                class="w-full p-2 border rounded focus:ring-2 focus:ring-blue-400" required
-                                @input="console.log('Title changed:', $event.target.value)">
+                                class="w-full p-2 border rounded focus:ring-2 focus:ring-blue-400" required>
                         </div>
 
                         <div class="mb-4">
                             <label class="block text-sm font-medium text-gray-700">Content</label>
                             <textarea name="content" placeholder="Enter content" 
-                                class="w-full p-2 border rounded focus:ring-2 focus:ring-blue-400" rows="4" required
-                                @input="console.log('Content changed:', $event.target.value)"></textarea>
+                                class="w-full p-2 border rounded focus:ring-2 focus:ring-blue-400" rows="4" required></textarea>
                         </div>
 
                         <div class="mb-4">
                             <label class="block text-sm font-medium text-gray-700">Image</label>
                             <input type="file" name="image" accept="image/*" 
-                                class="w-full p-2 border rounded focus:ring-2 focus:ring-blue-400"
-                                @change="console.log('Image selected:', $event.target.files[0])">
+                                class="w-full p-2 border rounded focus:ring-2 focus:ring-blue-400">
                             <p class="text-sm text-gray-500 mt-1">Max file size: 5MB. Supported formats: JPG, PNG, GIF</p>
                         </div>
 
@@ -125,22 +133,37 @@
         <template x-if="showModal && modalType === 'edit'" x-cloak>
             <div class="fixed inset-0 flex items-center justify-center bg-black bg-opacity-50">
                 <div class="bg-white p-6 rounded-lg shadow-lg w-1/3">
-                    <form :action="'/adminannouncement/edit/' + announcement._id" method="POST" enctype="multipart/form-data" @submit="console.log('Edit form submitted:', $event.target, announcement)">
+                    <form @submit.prevent="
+                        const formData = new FormData($event.target);
+                        fetch('/adminannouncement/edit/' + announcement._id, {
+                            method: 'POST',
+                            headers: {
+                                'X-CSRF-Token': '<%= csrfToken %>',
+                                'Accept': 'application/json'
+                            },
+                            body: formData
+                        })
+                        .then(response => {
+                            if (!response.ok) {
+                                throw new Error('Network response was not ok');
+                            }
+                            window.location.reload();
+                        })
+                        .catch(error => {
+                            console.error('Error:', error);
+                            alert('An error occurred while updating the announcement');
+                        })">
                         <input type="hidden" name="_csrf" value="<%= csrfToken %>">
-                        <input type="hidden" name="title" x-model="announcement.title">
-                        <input type="hidden" name="content" x-model="announcement.content">
                         <h2 class="text-lg font-semibold text-center mb-4">Edit Announcement</h2>
                         
                         <div class="mb-4">
                             <label class="block text-sm font-medium text-gray-700">Title</label>
-                            <input type="text" x-model="announcement.title" class="w-full p-2 border rounded" required
-                                @input="console.log('Edit title changed:', announcement.title)">
+                            <input type="text" name="title" x-model="announcement.title" class="w-full p-2 border rounded" required>
                         </div>
 
                         <div class="mb-4">
                             <label class="block text-sm font-medium text-gray-700">Content</label>
-                            <textarea x-model="announcement.content" class="w-full p-2 border rounded" rows="4" required
-                                @input="console.log('Edit content changed:', announcement.content)"></textarea>
+                            <textarea name="content" x-model="announcement.content" class="w-full p-2 border rounded" rows="4" required></textarea>
                         </div>
 
                         <div class="mb-4">
@@ -175,7 +198,24 @@
                     <p class="mb-4">Are you sure you want to delete this announcement?</p>
                     <div class="flex justify-end">
                         <button class="bg-gray-500 text-white px-4 py-2 rounded mr-2 hover:bg-gray-600 transition" @click="showDeleteModal = false">Cancel</button>
-                        <form :action="'/adminannouncement/delete/' + deleteAnnouncementId" method="POST">
+                        <form @submit.prevent="
+                            fetch('/adminannouncement/delete/' + deleteAnnouncementId, {
+                                method: 'POST',
+                                headers: {
+                                    'X-CSRF-Token': '<%= csrfToken %>',
+                                    'Accept': 'application/json'
+                                }
+                            })
+                            .then(response => {
+                                if (!response.ok) {
+                                    throw new Error('Network response was not ok');
+                                }
+                                window.location.reload();
+                            })
+                            .catch(error => {
+                                console.error('Error:', error);
+                                alert('An error occurred while deleting the announcement');
+                            })">
                             <input type="hidden" name="_csrf" value="<%= csrfToken %>">
                             <button type="submit" class="bg-red-500 text-white px-4 py-2 rounded hover:bg-red-600 transition">Delete</button>
                         </form>
@@ -186,10 +226,22 @@
     </div>
 </body>
 
+<!-- New script tag to safely pass announcements data -->
+<script id="raw-announcements-json" type="application/json">
+    <%- JSON.stringify(announcements) %>
+</script>
+
 <%- include('include/footer') %>
 
 <script>
 document.addEventListener('alpine:init', () => {
+    console.log('Alpine.js mainContent component initializing...');
+
+    // Retrieve the stringified announcements data from the new script tag
+    const rawAnnouncementsString = document.getElementById('raw-announcements-json').textContent;
+    const parsedAnnouncements = JSON.parse(rawAnnouncementsString);
+    console.log('Parsed announcements data:', parsedAnnouncements); // Debug log for parsed data
+
     Alpine.data('mainContent', () => ({
         showModal: false,
         modalType: '',
@@ -203,7 +255,7 @@ document.addEventListener('alpine:init', () => {
         showDeleteModal: false,
         deleteAnnouncementId: null,
         search: '',
-        announcements: JSON.parse('<%- JSON.stringify(announcements) %>'),
+        announcements: parsedAnnouncements, // Assign the parsed data here
 
         openAddModal() {
             console.log('Opening add modal');
@@ -219,6 +271,26 @@ document.addEventListener('alpine:init', () => {
             console.log('Add modal state:', { modalType: this.modalType, announcement: this.announcement });
         },
 
+        openEditModal(announcementId) {
+            console.log('Attempting to open edit modal for ID:', announcementId);
+            const announcementData = this.announcements.find(ann => ann._id === announcementId);
+            if (announcementData) {
+                this.modalType = 'edit';
+                // Deep copy the announcementData to ensure reactivity and prevent direct mutation of original data
+                this.announcement = {
+                    _id: announcementData._id,
+                    announcementId: announcementData.announcementId,
+                    title: announcementData.title,
+                    content: announcementData.content,
+                    image: announcementData.image || null
+                };
+                this.showModal = true;
+                console.log('Edit modal state after update:', { modalType: this.modalType, announcement: this.announcement });
+            } else {
+                console.error('Announcement with ID', announcementId, 'not found.');
+            }
+        },
+
         handleImageUpload(event) {
             console.log('Handling image upload:', event.target.files[0]);
             const file = event.target.files[0];
@@ -231,12 +303,21 @@ document.addEventListener('alpine:init', () => {
 
         // Filter announcements based on search
         get filteredAnnouncements() {
-            if (!this.search) return this.announcements;
+            console.log('filteredAnnouncements computed property accessed.');
+            console.log('Current search term:', this.search);
+            console.log('Original announcements count:', this.announcements.length);
+
+            if (!this.search) {
+                console.log('No search term, returning all announcements.');
+                return this.announcements;
+            }
             const searchLower = this.search.toLowerCase();
-            return this.announcements.filter(announcement => 
+            const filtered = this.announcements.filter(announcement => 
                 announcement.announcementId.toLowerCase().includes(searchLower) ||
                 announcement.title.toLowerCase().includes(searchLower)
             );
+            console.log('Filtered announcements count:', filtered.length);
+            return filtered;
         }
     }));
 });

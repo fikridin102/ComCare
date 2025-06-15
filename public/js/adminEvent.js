@@ -34,19 +34,75 @@ document.addEventListener('DOMContentLoaded', function() {
 function adminEvent() {
     return {
         showModal: false,
+        modalType: '',
+        event: {
+            _id: '',
+            eventId: '',
+            name: '',
+            venue: '',
+            date: '',
+            time: '',
+            budget: '',
+            remarks: ''
+        },
         showDeleteModal: false,
-        modalType: 'add',
-        event: {},
         deleteEventId: null,
         search: '',
+        events: [], // Will be populated from JSON script tag
 
         init() {
-            // Any initialization logic if needed
+            console.log('adminEvent Alpine.js component initializing...');
+
+            // Retrieve data from JSON script tag
+            const rawEventsString = document.getElementById('raw-events-json').textContent;
+            this.events = JSON.parse(rawEventsString).map(e => ({
+                ...e,
+                date: e.date ? new Date(e.date).toISOString().split('T')[0] : '' // Format date for input type="date"
+            }));
+            console.log('Initialized events:', this.events);
+
+            this.$watch('showModal', value => {
+                if (!value) {
+                    this.resetForm();
+                    this.editEventId = null;
+                }
+            });
         },
 
-        openEditModal(event) {
-            this.event = { ...event };
+        // Computed property for filtered events
+        get filteredEvents() {
+            console.log('filteredEvents computed property accessed. Search:', this.search);
+            if (!this.search) {
+                console.log('No search term, returning all events.');
+                return this.events;
+            }
+            const searchLower = this.search.toLowerCase();
+            return this.events.filter(event => 
+                (event.eventId && event.eventId.toLowerCase().includes(searchLower)) ||
+                (event.name && event.name.toLowerCase().includes(searchLower)) ||
+                (event.venue && event.venue.toLowerCase().includes(searchLower))
+            );
+        },
+
+        openAddModal() {
+            this.modalType = 'add';
+            this.resetForm();
+            this.showModal = true;
+        },
+
+        openEditModal(eventData) {
+            console.log('Opening edit modal with data:', eventData);
             this.modalType = 'edit';
+            this.event = {
+                _id: eventData._id,
+                eventId: eventData.eventId,
+                name: eventData.name,
+                venue: eventData.venue,
+                date: this.formatDate(eventData.date),
+                time: eventData.time,
+                budget: eventData.budget,
+                remarks: eventData.remarks
+            };
             this.showModal = true;
         },
 
@@ -57,12 +113,34 @@ function adminEvent() {
 
         closeModal() {
             this.showModal = false;
-            this.event = {};
+            this.resetForm();
         },
 
         closeDeleteModal() {
             this.showDeleteModal = false;
             this.deleteEventId = null;
+        },
+
+        resetForm() {
+            this.event = {
+                _id: '',
+                eventId: '',
+                name: '',
+                venue: '',
+                date: '',
+                time: '',
+                budget: '',
+                remarks: ''
+            };
+        },
+
+        formatDate(dateString) {
+            if (!dateString) return '';
+            const date = new Date(dateString);
+            const year = date.getFullYear();
+            const month = String(date.getMonth() + 1).padStart(2, '0'); // Months are 0-indexed
+            const day = String(date.getDate()).padStart(2, '0');
+            return `${year}-${month}-${day}`;
         }
     };
 } 

@@ -14,7 +14,6 @@ const claimController = require("../controllers/claimController");
 const dependantController = require('../controllers/dependantController');
 const eventController = require('../controllers/eventController');
 const csrf = require('csurf');
-const csrfDebugMiddleware = require('../middleware/csrfDebugMiddleware');
 const nodemailer = require('nodemailer'); // Import nodemailer
 const Dependant = require('../models/dependant');
 const { sendEmail } = require('../utils/emailer');
@@ -33,8 +32,8 @@ router.get("/login", (req, res) => {
 });
 
 // Auth Routes
-router.post("/register", csrfDebugMiddleware, registerUser);
-router.post("/login", csrfDebugMiddleware, loginUser);
+router.post("/register", registerUser);
+router.post("/login", loginUser);
 router.get("/logout", (req, res) => {
     req.session.destroy();
     res.redirect("/login");
@@ -73,22 +72,22 @@ router.get("/userprofile", isAuthenticated, isMember, async (req, res) => {
 
 // Member Dependant Routes
 router.get("/memberdependant", isAuthenticated, isMember, memberController.getMemberDependants);
-router.post("/memberdependant", isAuthenticated, isMember, csrfDebugMiddleware, memberController.addMemberDependant);
-router.post("/memberdependant/:id/update", isAuthenticated, isMember, csrfDebugMiddleware, memberController.updateMemberDependant);
-router.post("/memberdependant/:id/delete", isAuthenticated, isMember, csrfDebugMiddleware, memberController.deleteMemberDependant);
+router.post("/memberdependant", isAuthenticated, isMember, memberController.addMemberDependant);
+router.post("/memberdependant/:id/update", isAuthenticated, isMember, memberController.updateMemberDependant);
+router.post("/memberdependant/:id/delete", isAuthenticated, isMember, memberController.deleteMemberDependant);
 
 // Member Payment Routes
 router.get("/memberpayment", isAuthenticated, isMember, paymentController.getPaymentHistory);
-router.post("/memberpayment", isAuthenticated, isMember, csrfDebugMiddleware, paymentController.createPayment);
-router.post("/create-payment-intent", isAuthenticated, isMember, csrfDebugMiddleware, paymentController.createPaymentIntent);
+router.post("/memberpayment", isAuthenticated, isMember, paymentController.createPayment);
+router.post("/create-payment-intent", isAuthenticated, isMember, paymentController.createPaymentIntent);
 router.get("/payment-success", isAuthenticated, isMember, paymentController.handlePaymentSuccess);
 
 // Password change route
-router.post("/change-password", isAuthenticated, csrfDebugMiddleware, memberController.changePassword);
+router.post("/change-password", isAuthenticated, memberController.changePassword);
 
 // Member Claim Routes
 router.get("/memberclaim", isAuthenticated, isMember, claimController.getClaimPage);
-router.post("/memberclaim", isAuthenticated, isMember, csrfDebugMiddleware, claimController.submitClaim);
+router.post("/memberclaim", isAuthenticated, isMember, claimController.submitClaim);
 
 // Admin Routes
 router.get("/admindashboard", isAuthenticated, isAdmin, adminController.getAdminDashboard);
@@ -105,22 +104,22 @@ router.get("/adminprofile", isAuthenticated, isAdmin, (req, res) => {
 
 // Admin Member Routes
 router.get("/adminmember", isAuthenticated, isAdmin, memberController.getMemberList);
-router.post("/adminmembers", isAuthenticated, isAdmin, csrfDebugMiddleware, memberController.addNewMember);
-router.post("/adminmembers/edit/:id", isAuthenticated, isAdmin, csrfDebugMiddleware, memberController.editMember);
-router.post("/adminmembers/delete/:id", isAuthenticated, isAdmin, csrfDebugMiddleware, memberController.deleteMember);
-router.post("/adminmembers/status/:id", isAuthenticated, isAdmin, csrfDebugMiddleware, memberController.updateMemberStatus);
+router.post("/adminmembers", isAuthenticated, isAdmin, memberController.addNewMember);
+router.post("/adminmembers/edit/:id", isAuthenticated, isAdmin, memberController.editMember);
+router.post("/adminmembers/delete/:id", isAuthenticated, isAdmin, memberController.deleteMember);
+router.post("/adminmembers/status/:id", isAuthenticated, isAdmin, memberController.updateMemberStatus);
 
 // Admin Dependant Routes
 router.get("/admindependant", isAuthenticated, isAdmin, dependantController.getAllDependants);
-router.post("/admindependant", isAuthenticated, isAdmin, csrfDebugMiddleware, dependantController.addDependant);
-router.post("/admindependant/:id/update", isAuthenticated, isAdmin, csrfDebugMiddleware, dependantController.updateDependant);
-router.post("/admindependant/:id/delete", isAuthenticated, isAdmin, csrfDebugMiddleware, dependantController.deleteDependant);
+router.post("/admindependant", isAuthenticated, isAdmin, dependantController.addDependant);
+router.post("/admindependant/:id/update", isAuthenticated, isAdmin, dependantController.updateDependant);
+router.post("/admindependant/:id/delete", isAuthenticated, isAdmin, dependantController.deleteDependant);
 
 // Admin Event Routes
 router.get("/adminevent", isAuthenticated, isAdmin, eventController.getEventList);
-router.post("/adminevent", isAuthenticated, isAdmin, csrfDebugMiddleware, eventController.addEvent);
-router.post("/adminevent/edit/:id", isAuthenticated, isAdmin, csrfDebugMiddleware, eventController.editEvent);
-router.post("/adminevent/delete/:id", isAuthenticated, isAdmin, csrfDebugMiddleware, eventController.deleteEvent);
+router.post("/adminevent", isAuthenticated, isAdmin, eventController.addEvent);
+router.post("/adminevent/edit/:id", isAuthenticated, isAdmin, eventController.editEvent);
+router.post("/adminevent/delete/:id", isAuthenticated, isAdmin, eventController.deleteEvent);
 
 // Admin Payment Routes
 router.get("/adminpayment", isAuthenticated, isAdmin, async (req, res) => {
@@ -164,91 +163,22 @@ router.get("/adminpayment", isAuthenticated, isAdmin, async (req, res) => {
 
 // Admin Announcement Routes
 router.get('/adminannouncement', isAuthenticated, isAdmin, announcementController.getAdminAnnouncement);
-router.post('/adminannouncement', isAuthenticated, isAdmin, uploadAnnouncement.single('image'), csrfDebugMiddleware, announcementController.postAdminAnnouncement);
-router.post('/adminannouncement/edit/:id', isAuthenticated, isAdmin, uploadAnnouncement.single('image'), csrfDebugMiddleware, announcementController.editAnnouncement);
-router.post('/adminannouncement/delete/:id', isAuthenticated, isAdmin, csrfDebugMiddleware, announcementController.deleteAnnouncement);
+router.post('/adminannouncement', isAuthenticated, isAdmin, uploadAnnouncement.single('image'), announcementController.postAdminAnnouncement);
+router.post('/adminannouncement/edit/:id', isAuthenticated, isAdmin, uploadAnnouncement.single('image'), announcementController.editAnnouncement);
+router.post('/adminannouncement/delete/:id', isAuthenticated, isAdmin, announcementController.deleteAnnouncement);
 
 // Public Announcement API Routes
 router.get("/api/announcements/latest", announcementController.getLatestAnnouncement);
-router.post("/api/announcements", isAuthenticated, isAdmin, uploadAnnouncement.single('image'), csrfDebugMiddleware, announcementController.createAnnouncement);
+router.post("/api/announcements", isAuthenticated, isAdmin, uploadAnnouncement.single('image'), announcementController.createAnnouncement);
 router.get("/api/announcements", announcementController.getAllAnnouncements);
 
 // Profile Update Route
-router.post("/update-profile", isAuthenticated, uploadProfile.single('profilePicture'), csrfDebugMiddleware, async (req, res) => {
-    try {
-        const userId = req.session.user._id;
-        const user = await User.findById(userId);
-        
-        if (!user) {
-            req.flash('error', 'User not found');
-            return res.redirect('/userprofile');
-        }
-
-        // Track changes
-        const changes = [];
-        
-        // Update fields if provided
-        if (req.body.fullname && req.body.fullname !== user.fullname) {
-            user.fullname = req.body.fullname;
-            changes.push(`Name changed to: ${req.body.fullname}`);
-        }
-        if (req.body.phoneNum && req.body.phoneNum !== user.phoneNum) {
-            user.phoneNum = req.body.phoneNum;
-            changes.push(`Phone number changed to: ${req.body.phoneNum}`);
-        }
-        if (req.body.address && req.body.address !== user.address) {
-            user.address = req.body.address;
-            changes.push(`Address changed to: ${req.body.address}`);
-        }
-        if (req.file) {
-            user.profilePicture = '/uploads/profiles/' + req.file.filename;
-            changes.push('Profile picture updated');
-        }
-
-        const updatedUser = await user.save();
-
-        // Send email notification to heir if changes occurred and heir exists
-        if (changes.length > 0) {
-            const heir = await Dependant.findOne({ memberId: userId, isHeir: true });
-            if (heir && heir.heirEmail) {
-                const emailHtml = `
-                    <p>Dear ${heir.name},</p>
-                    <p>This is to inform you that the profile of ${updatedUser.fullname} has been updated.</p>
-                    <p>Details of changes:</p>
-                    <ul>
-                        ${changes.map(change => `<li>${change}</li>`).join('')}
-                    </ul>
-                    <p>If you have any concerns, please contact support.</p>
-                    <p>Best regards,<br>The ComCare Team</p>
-                `;
-
-                await sendEmail(
-                    heir.heirEmail,
-                    'Member Profile Update Notification',
-                    emailHtml
-                );
-            }
-        }
-
-        req.session.user = {
-            ...req.session.user,
-            fullname: updatedUser.fullname,
-            profilePicture: updatedUser.profilePicture
-        };
-
-        req.flash('success', 'Profile updated successfully');
-        res.redirect(req.session.user.userType === 'admin' ? '/adminprofile' : '/userprofile');
-    } catch (error) {
-        console.error('Error updating profile:', error);
-        req.flash('error', 'Error updating profile');
-        res.redirect('/userprofile');
-    }
-});
+router.post("/update-profile", isAuthenticated, uploadProfile.single('profilePicture'), memberController.updateProfile);
 
 // Admin Claim Routes
 router.get("/adminclaim", isAuthenticated, isAdmin, claimController.getAdminClaims);
-router.post("/adminclaim/:id/approve", isAuthenticated, isAdmin, csrfDebugMiddleware, claimController.approveClaim);
-router.post("/adminclaim/reject/:id", isAuthenticated, isAdmin, csrfDebugMiddleware, claimController.rejectClaim);
+router.post("/adminclaim/:id/approve", isAuthenticated, isAdmin, claimController.approveClaim);
+router.post("/adminclaim/reject/:id", isAuthenticated, isAdmin, claimController.rejectClaim);
 router.get("/adminclaim/:id", isAuthenticated, isAdmin, claimController.getClaimDetails);
 
 // API Routes

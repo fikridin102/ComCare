@@ -8,7 +8,6 @@ const connectDB = require("./server/database/connection");
 const flash = require("connect-flash");
 const csrf = require('csurf');
 const multer = require('multer');
-const csrfDebugMiddleware = require('./server/middleware/csrfDebugMiddleware');
 const path = require('path');
 
 // Load environment variables from .env file
@@ -38,16 +37,14 @@ app.use(express.urlencoded({ extended: true }));
 app.use(express.json());
 app.use(cookieParser());
 app.use(morgan("tiny"));
-// app.use(bodyParser.json()); // Commented out
-// app.use(bodyParser.urlencoded({ extended: true })); // Commented out
 
 // Setup sessions (necessary for CSRF)
 app.use(session({
-    secret: process.env.JWT_SECRET,
+    secret: env.JWT_SECRET,
     resave: false,
     saveUninitialized: true,
     cookie: { 
-        secure: false, // Set true if using HTTPS
+        secure: process.env.NODE_ENV === 'production',
         httpOnly: true,
         maxAge: 24 * 60 * 60 * 1000 // 24 hours
     }
@@ -56,13 +53,13 @@ app.use(session({
 // Enable Flash Messages
 app.use(flash());
 
-// Setup CSRF Protection globally (for res.locals.csrfToken)
-// The csrfDebugMiddleware will internally apply csurf and log
-app.use(csrfDebugMiddleware);
+// Setup CSRF Protection globally
+app.use(csrf({ cookie: true }));
 
 // Pass CSRF Token and messages to all views
 app.use((req, res, next) => {
-    res.locals.csrfToken = req.csrfToken ? req.csrfToken() : ''; // Ensure it's always defined
+    console.log('CSRF Token in res.locals:', req.csrfToken ? req.csrfToken() : 'Not available');
+    res.locals.csrfToken = req.csrfToken(); // req.csrfToken() is available after csurf
     res.locals.messages = {
         success: req.flash("success"),
         error: req.flash("error")
@@ -90,7 +87,7 @@ app.get("/", (req, res) => {
         error: req.flash("error"),
         success: req.flash("success")
         },
-        // csrfToken: req.csrfToken() // No longer needed here, handled by res.locals
+        // csrfToken is now available via res.locals
     });
 });
 
@@ -103,10 +100,10 @@ app.get('/csrf-token', (req, res) => {
     res.json({ csrfToken: req.csrfToken() });
 });
 
-// Error handler for CSRF token errors (MUST be after session and csurf middleware)
+// Error handler for CSRF token errors (MUST be after session, cookie-parser, body-parser, and csurf middleware)
 app.use((err, req, res, next) => {
     if (err.code === 'EBADCSRFTOKEN') {
-        console.error('CSRF Token Error:', err.message); // Log the specific error
+        console.error('CSRF Token Error:', err.message, 'from IP:', req.ip || req.connection.remoteAddress);
         // If the request expects JSON (e.g., AJAX call), send JSON error
         if (req.accepts('json')) {
             return res.status(403).json({ success: false, message: 'Invalid CSRF token. Please refresh the page and try again.' });
@@ -137,6 +134,15 @@ app.use((err, req, res, next) => {
         req.flash('error', 'An unexpected error occurred during file upload.');
         next(err); // Pass the error to the next error handler
     }
+});
+
+// Final error handler (catch all unhandled errors)
+app.use((err, req, res, next) => {
+    console.error('Unhandled Server Error:', err);
+    if (req.accepts('json')) {
+        return res.status(500).json({ success: false, message: 'An unexpected server error occurred.' });
+    }
+    res.status(500).send('An unexpected error occurred.');
 });
 
 // Start Server

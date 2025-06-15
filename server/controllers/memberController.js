@@ -589,69 +589,54 @@ exports.deleteMemberDependant = async (req, res) => {
 // Update profile
 exports.updateProfile = async (req, res) => {
     try {
-        // 1. Get user ID from session and find the user
-        const userId = req.session.user.id; // Correctly get ID from session
+        // 1. Authenticate user and get ID
+        const userId = req.session.user.id; // Get user ID from session
         if (!userId) {
-            return res.status(401).json({
-                success: false,
-                message: 'Unauthorized: User ID not found in session.'
-            });
+            return res.status(401).json({ success: false, message: 'Unauthorized: User ID not found in session.' });
         }
 
         const user = await User.findById(userId);
         if (!user) {
-            return res.status(404).json({
-                success: false,
-                message: 'User not found.'
-            });
+            return res.status(404).json({ success: false, message: 'User not found.' });
         }
 
         // 2. Extract data from request body
         const { username, fullname, email, birthDate, phoneNum, address } = req.body;
 
-        // 3. Track changes for heir notification and response
+        // 3. Track changes and prepare updated fields
         const changes = [];
-        const updatedFields = {}; // Object to hold fields that actually changed
+        const updatedUserFields = {}; // Object to store fields that are actually updated
 
-        // 4. Validate and update each field, tracking changes
+        // 4. Validate and update each field
 
         // Username
         if (username !== undefined && username !== user.username) {
             const existingUser = await User.findOne({ username: username, _id: { $ne: userId } });
             if (existingUser) {
-                return res.status(400).json({
-                    success: false,
-                    message: 'Username is already taken.'
-                });
+                return res.status(400).json({ success: false, message: 'Username is already taken.' });
             }
-            user.username = username;
-            updatedFields.username = username;
-            changes.push(`Username changed from '${req.session.user.username}' to '${username}'`);
+            updatedUserFields.username = username;
+            changes.push(`Username changed from '${user.username}' to '${username}'`);
         }
 
         // Full Name
         if (fullname !== undefined && fullname !== user.fullname) {
-            user.fullname = fullname;
-            updatedFields.fullname = fullname;
-            changes.push(`Full Name changed from '${req.session.user.fullname}' to '${fullname}'`);
+            updatedUserFields.fullname = fullname;
+            changes.push(`Full Name changed from '${user.fullname}' to '${fullname}'`);
         }
 
         // Email
         if (email !== undefined && email !== user.email) {
             const existingUser = await User.findOne({ email: email, _id: { $ne: userId } });
             if (existingUser) {
-                return res.status(400).json({
-                    success: false,
-                    message: 'Email is already taken.'
-                });
+                return res.status(400).json({ success: false, message: 'Email is already taken.' });
             }
-            user.email = email;
-            updatedFields.email = email;
-            changes.push(`Email changed from '${req.session.user.email}' to '${email}'`);
+            updatedUserFields.email = email;
+            changes.push(`Email changed from '${user.email}' to '${email}'`);
         }
 
         // Birth Date & Age
-        if (birthDate !== undefined && birthDate !== user.birthDate) {
+        if (birthDate !== undefined && birthDate !== (user.birthDate ? user.birthDate.toISOString().split('T')[0] : '')) {
             const newBirthDate = new Date(birthDate);
             const today = new Date();
             let newAge = today.getFullYear() - newBirthDate.getFullYear();
@@ -659,51 +644,45 @@ exports.updateProfile = async (req, res) => {
             if (monthDiff < 0 || (monthDiff === 0 && today.getDate() < newBirthDate.getDate())) {
                 newAge--;
             }
-            user.birthDate = newBirthDate;
-            user.age = newAge;
-            updatedFields.birthDate = birthDate; // Send back as ISO string
-            updatedFields.age = newAge;
+            updatedUserFields.birthDate = newBirthDate;
+            updatedUserFields.age = newAge;
             changes.push(`Birth Date changed to: ${birthDate} (Age: ${newAge})`);
         }
 
         // Phone Number
         if (phoneNum !== undefined && phoneNum !== user.phoneNum) {
-            user.phoneNum = phoneNum;
-            updatedFields.phoneNum = phoneNum;
-            changes.push(`Phone Number changed from '${req.session.user.phoneNum}' to '${phoneNum}'`);
+            updatedUserFields.phoneNum = phoneNum;
+            changes.push(`Phone Number changed from '${user.phoneNum}' to '${phoneNum}'`);
         }
 
         // Address
         if (address !== undefined && address !== user.address) {
-            user.address = address;
-            updatedFields.address = address;
-            changes.push(`Address changed from '${req.session.user.address}' to '${address}'`);
+            updatedUserFields.address = address;
+            changes.push(`Address changed from '${user.address}' to '${address}'`);
         }
 
-        // If no changes were made, return early
-        if (changes.length === 0) {
-            return res.status(200).json({
-                success: true,
-                message: 'No changes were detected.',
-                user: req.session.user // Return current session user data
-            });
+        // If no actual changes were detected, return success without saving/notifying
+        if (Object.keys(updatedUserFields).length === 0) {
+            return res.status(200).json({ success: true, message: 'No changes were detected.', user: req.session.user });
         }
 
-        // 5. Save the updated user
+        // 5. Apply updates and save user
+        Object.assign(user, updatedUserFields);
         await user.save();
 
-        // 6. Update session with the latest user data (critical for frontend to reflect changes)
-        // We only update fields that were sent and changed to avoid overwriting other session data
-        req.session.user = { ...req.session.user, ...updatedFields };
+        // 6. Update session data (critical for frontend consistency)
+        req.session.user = { ...req.session.user, ...updatedUserFields };
 
-        // 7. Notify heir
-        await notifyHeir(
-            userId,
-            'Member Profile Update Notification',
-            `The profile of ${user.fullname} (${user.username}) has been updated with the following changes:\n- ${changes.join('\n- ')}`
-        );
+        // 7. Notify heir about profile changes
+        if (changes.length > 0) {
+            await notifyHeir(
+                userId,
+                'Member Profile Update Notification',
+                `The profile of ${user.fullname} (${user.username}) has been updated with the following changes:\n- ${changes.join('\n- ')}`
+            );
+        }
 
-        // 8. Send success response
+        // 8. Send success response with updated user data
         return res.status(200).json({
             success: true,
             message: 'Profile updated successfully!',
@@ -711,19 +690,14 @@ exports.updateProfile = async (req, res) => {
         });
 
     } catch (error) {
-        console.error('Error updating profile:', error);
-        // Handle Mongoose validation errors or other server errors
+        console.error('Error updating profile:', error); // Log the full error for debugging
+        // Handle Mongoose validation errors
         if (error.name === 'ValidationError') {
             const messages = Object.values(error.errors).map(val => val.message);
-            return res.status(400).json({
-                success: false,
-                message: messages.join('; ')
-            });
+            return res.status(400).json({ success: false, message: messages.join('; ') });
         }
-        return res.status(500).json({
-            success: false,
-            message: 'An error occurred while updating profile. Please try again.'
-        });
+        // Handle other unexpected errors
+        return res.status(500).json({ success: false, message: 'An unexpected error occurred while updating profile. Please try again.' });
     }
 };
 
@@ -917,6 +891,14 @@ exports.changePassword = async (req, res) => {
             return res.status(400).json({
                 success: false,
                 message: 'Current password is incorrect'
+            });
+        }
+
+        // Check if new password is the same as the current password
+        if (newPassword === currentPassword) {
+            return res.status(400).json({
+                success: false,
+                message: 'New password cannot be the same as the current password'
             });
         }
 
