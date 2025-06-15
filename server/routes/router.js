@@ -17,6 +17,7 @@ const csrf = require('csurf');
 const nodemailer = require('nodemailer'); // Import nodemailer
 const Dependant = require('../models/dependant');
 const { sendEmail } = require('../utils/emailer');
+const multer = require('multer'); // Re-import multer here to ensure it's available in this scope
 
 // Setup CSRF Protection locally in router.js
 // const csrfProtection = csrf({ cookie: false });
@@ -91,15 +92,27 @@ router.post("/memberclaim", isAuthenticated, isMember, claimController.submitCla
 
 // Admin Routes
 router.get("/admindashboard", isAuthenticated, isAdmin, adminController.getAdminDashboard);
-router.get("/adminprofile", isAuthenticated, isAdmin, (req, res) => {
-    res.render("adminprofile", {
-        user: req.session.user,
-        csrfToken: req.csrfToken(),
-        messages: {
-            error: req.flash('error'),
-            success: req.flash('success')
+router.get("/adminprofile", isAuthenticated, isAdmin, async (req, res) => {
+    try {
+        const user = await User.findById(req.session.user.id);
+        if (!user) {
+            req.flash('error', 'Admin user not found.');
+            return res.redirect('/admindashboard');
         }
-    });
+
+        res.render("adminprofile", {
+            user,
+            csrfToken: req.csrfToken(),
+            messages: {
+                error: req.flash('error'),
+                success: req.flash('success')
+            }
+        });
+    } catch (error) {
+        console.error("Error fetching admin profile:", error);
+        req.flash('error', 'Error fetching admin profile.');
+        res.redirect('/admindashboard');
+    }
 });
 
 // Admin Member Routes
@@ -118,7 +131,10 @@ router.post("/admindependant/:id/delete", isAuthenticated, isAdmin, dependantCon
 // Admin Event Routes
 router.get("/adminevent", isAuthenticated, isAdmin, eventController.getEventList);
 router.post("/adminevent", isAuthenticated, isAdmin, eventController.addEvent);
-router.post("/adminevent/edit/:id", isAuthenticated, isAdmin, eventController.editEvent);
+router.post("/adminevent/edit/:id", isAuthenticated, isAdmin, multer().none(), (req, res, next) => {
+    console.log(`[Router] Hit POST /adminevent/edit/:id for ID: ${req.params.id}`);
+    next();
+}, eventController.editEvent);
 router.post("/adminevent/delete/:id", isAuthenticated, isAdmin, eventController.deleteEvent);
 
 // Admin Payment Routes

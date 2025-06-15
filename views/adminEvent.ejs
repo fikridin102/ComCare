@@ -122,9 +122,9 @@
 
         <!-- Edit Event Modal -->
         <template x-if="showModal && modalType === 'edit'" x-cloak>
-            <div class="fixed inset-0 flex items-center justify-center bg-black bg-opacity-50">
+            <div id="editEventModal" class="fixed inset-0 flex items-center justify-center bg-black bg-opacity-50">
                 <div class="bg-white p-6 rounded-lg shadow-lg w-1/3">
-                    <form :action="'/adminevent/edit/' + event._id" method="POST">
+                    <form :action="'/adminevent/edit/' + event._id" method="POST" @submit.prevent="submitEditForm">
                         <input type="hidden" name="_csrf" value="<%= csrfToken %>">
                         <input type="hidden" name="id" :value="event._id">
                         <h2 class="text-lg font-semibold text-center mb-4">Edit Event</h2>

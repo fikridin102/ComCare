@@ -3,7 +3,6 @@ function adminDependant() {
         showModal: false,
         showDeleteModal: false,
         modalType: '',
-        editDependantId: null,
         dependant: {
             _id: '',
             name: '',
@@ -39,26 +38,6 @@ function adminDependant() {
             this.$watch('showModal', value => {
                 if (!value) {
                     this.resetForm();
-                    this.editDependantId = null;
-                }
-            });
-
-            this.$watch('editDependantId', id => {
-                if (id) {
-                    const dependant = this.dependants.find(d => d._id === id);
-                    if (dependant) {
-                        this.dependant = {
-                            _id: dependant._id,
-                            name: dependant.name,
-                            ic: dependant.ic,
-                            birthday: this.formatDate(dependant.birthday),
-                            age: dependant.age,
-                            gender: dependant.gender,
-                            relationship: dependant.relationship,
-                            memberId: dependant.memberId
-                        };
-                        this.modalType = 'edit';
-                    }
                 }
             });
         },
@@ -94,6 +73,7 @@ function adminDependant() {
         openEditModal(dependantData) {
             console.log('Opening edit modal with data:', dependantData);
             this.modalType = 'edit';
+            this.showModal = true;
             this.dependant = {
                 _id: dependantData._id,
                 name: dependantData.name,
@@ -104,7 +84,7 @@ function adminDependant() {
                 relationship: dependantData.relationship,
                 memberId: dependantData.memberId
             };
-            this.showModal = true;
+            console.log('Set dependant data:', this.dependant);
         },
 
         openAddModal() {
@@ -148,6 +128,51 @@ function adminDependant() {
             const month = String(date.getMonth() + 1).padStart(2, '0'); // Months are 0-indexed
             const day = String(date.getDate()).padStart(2, '0');
             return `${year}-${month}-${day}`;
+        },
+
+        async submitForm() {
+            try {
+                console.log('Submitting form with data:', this.dependant);
+                
+                // Create a temporary form element
+                const form = document.createElement('form');
+                form.method = 'POST';
+                form.action = '/admindependant';
+
+                // Add CSRF token
+                const csrfInput = document.createElement('input');
+                csrfInput.type = 'hidden';
+                csrfInput.name = '_csrf';
+                csrfInput.value = document.querySelector('input[name="_csrf"]').value;
+                form.appendChild(csrfInput);
+
+                // Add all form fields
+                const fields = {
+                    name: this.dependant.name,
+                    ic: this.dependant.ic,
+                    birthday: this.dependant.birthday,
+                    age: this.dependant.age,
+                    gender: this.dependant.gender,
+                    relationship: this.dependant.relationship,
+                    memberId: this.dependant.memberId
+                };
+
+                for (const [key, value] of Object.entries(fields)) {
+                    const input = document.createElement('input');
+                    input.type = 'hidden';
+                    input.name = key;
+                    input.value = value;
+                    form.appendChild(input);
+                }
+
+                // Add form to document, submit it, and remove it
+                document.body.appendChild(form);
+                form.submit();
+                document.body.removeChild(form);
+            } catch (error) {
+                console.error('Error submitting form:', error);
+                alert('Error adding dependant. Please try again.');
+            }
         }
     };
 } 

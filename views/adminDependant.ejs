@@ -23,7 +23,7 @@
                                     <th class="border border-gray-300 px-4 py-2">#</th>
                                     <th class="border border-gray-300 px-4 py-2">Name</th>
                                     <th class="border border-gray-300 px-4 py-2">IC Number</th>
-                                    <th class="border border-gray-300 px-4 py-2">Birthday</th>
+                                    <th class="border border-gray-300 px-4 py-2">Birthday Date</th>
                                     <th class="border border-gray-300 px-4 py-2">Age</th>
                                     <th class="border border-gray-300 px-4 py-2">Gender</th>
                                     <th class="border border-gray-300 px-4 py-2">Relationship</th>
@@ -73,7 +73,7 @@
         <template x-if="showModal && modalType === 'add'" x-cloak>
             <div class="fixed inset-0 flex items-center justify-center bg-black bg-opacity-50">
                 <div class="bg-white p-6 rounded-lg shadow-lg w-1/3">
-                    <form action="/admindependant" method="POST">
+                    <form id="addDependantForm" action="/admindependant" method="POST">
                         <input type="hidden" name="_csrf" value="<%= csrfToken %>">
                         <h2 class="text-lg font-semibold text-center mb-4">Add Dependant</h2>
                         
@@ -226,7 +226,7 @@
                     <p class="mb-4">Are you sure you want to delete this dependant?</p>
                     <div class="flex justify-end">
                         <button class="bg-gray-500 text-white px-4 py-2 rounded mr-2 hover:bg-gray-600 transition" @click="closeDeleteModal()">Cancel</button>
-                        <form :action="'/admindependant/' + deleteDependantId + '/delete'" method="POST" style="display: inline;">
+                        <form :action="'/admindependant/delete/' + deleteDependantId" method="POST" style="display: inline;">
                             <input type="hidden" name="_csrf" value="<%= csrfToken %>">
                             <button type="submit" class="bg-red-500 text-white px-4 py-2 rounded hover:bg-red-600 transition">Delete</button>
                         </form>
@@ -239,6 +239,11 @@
     <!-- New script tag to safely pass dependants data -->
     <script id="raw-dependants-json" type="application/json">
         <%- JSON.stringify(dependants || []) %>
+    </script>
+
+    <!-- New script tag to safely pass members data -->
+    <script id="raw-members-json" type="application/json">
+        <%- JSON.stringify(members || []) %>
     </script>
 
     <!-- Add Alpine.js and adminDependant.js -->

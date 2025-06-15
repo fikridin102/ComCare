@@ -22,9 +22,9 @@
                                 <tr class="bg-gray-200">
                                     <th class="border border-gray-300 px-4 py-2">#</th>
                                     <th class="border border-gray-300 px-4 py-2">Member ID</th>
-                                    <th class="border border-gray-300 px-4 py-2">Name</th>
+                                    <th class="border border-gray-300 px-4 py-2">Full Name</th>
                                     <th class="border border-gray-300 px-4 py-2">IC Number</th>
-                                    <th class="border border-gray-300 px-4 py-2">Birthday Date</th>
+                                    <th class="border border-gray-300 px-4 py-2">Birthday</th>
                                     <th class="border border-gray-300 px-4 py-2">Age</th>
                                     <th class="border border-gray-300 px-4 py-2">Address</th>
                                     <th class="border border-gray-300 px-4 py-2">Phone Number</th>
@@ -151,7 +151,6 @@
                         <h2 class="text-lg font-semibold text-center mb-4">Edit Member</h2>
                         
                         <div class="grid grid-cols-2 gap-4">
-
                             <div>
                                 <label class="block text-sm font-medium text-gray-700">Full Name</label>
                                 <input type="text" name="fullname" x-model="member.fullname" class="w-full p-2 border rounded" required>
@@ -227,7 +226,7 @@
 
     <!-- New script tag to safely pass members data -->
     <script id="raw-members-json" type="application/json">
-        <%- JSON.stringify(members || []) %>
+        <%- membersJson %>
     </script>
 
     <!-- Add Alpine.js and adminMember.js -->

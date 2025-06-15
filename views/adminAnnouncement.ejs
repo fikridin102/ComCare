@@ -31,33 +31,33 @@
                         </thead>
                         <tbody>
                             <template x-for="(announcement, index) in filteredAnnouncements" :key="announcement._id">
-                                <tr>
+                                    <tr>
                                     <td class="border border-gray-300 px-4 py-2" x-text="index + 1"></td>
                                     <td class="border border-gray-300 px-4 py-2 font-mono" x-text="announcement.announcementId"></td>
                                     <td class="border border-gray-300 px-4 py-2" x-text="announcement.title"></td>
                                     <td class="border border-gray-300 px-4 py-2" x-text="announcement.content"></td>
-                                    <td class="border border-gray-300 px-4 py-2 text-center">
+                                        <td class="border border-gray-300 px-4 py-2 text-center">
                                         <template x-if="announcement.image">
                                             <img :src="announcement.image" alt="Announcement Image" style="max-width: 80px; max-height: 60px; border-radius: 4px;" />
                                         </template>
                                         <template x-if="!announcement.image">
-                                            <span class="text-gray-400">No image</span>
+                                                <span class="text-gray-400">No image</span>
                                         </template>
-                                    </td>
+                                        </td>
                                     <td class="border border-gray-300 px-4 py-2" x-text="new Date(announcement.date).toLocaleDateString()"></td>
-                                    <td class="border border-gray-300 px-4 py-2 text-center">
+                                        <td class="border border-gray-300 px-4 py-2 text-center">
                                         <button @click="console.log('Edit button clicked for ID:', announcement._id); openEditModal(announcement._id)">
-                                            <img src="/assets/images/edit.png" class="w-5 h-5">
-                                        </button>
+                                                <img src="/assets/images/edit.png" class="w-5 h-5">
+                                            </button>
                                         <button @click="showDeleteModal = true; deleteAnnouncementId = announcement._id">
-                                            <img src="/assets/images/delete.png" class="w-5 h-5">
-                                        </button>
-                                    </td>
-                                </tr>
+                                                <img src="/assets/images/delete.png" class="w-5 h-5">
+                                            </button>
+                                        </td>
+                                    </tr>
                             </template>
                             <tr x-show="filteredAnnouncements.length === 0">
                                 <td colspan="7" class="text-center border border-gray-300 px-4 py-2">No announcements found.</td>
-                            </tr>
+                                </tr>
                         </tbody>
                     </table>
                 </div>

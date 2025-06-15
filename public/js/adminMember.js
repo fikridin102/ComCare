@@ -2,6 +2,7 @@ function adminMember() {
     return {
         showModal: false,
         modalType: '',
+        editMemberId: null,
         member: {
             _id: '',
             customId: '',
@@ -20,6 +21,15 @@ function adminMember() {
         search: '',
         members: [], // Will be populated from JSON script tag
 
+        get filteredMembers() {
+            if (!this.search) return this.members;
+            const searchLower = this.search.toLowerCase();
+            return this.members.filter(member => 
+                member.fullname.toLowerCase().includes(searchLower) ||
+                member.customId.toLowerCase().includes(searchLower)
+            );
+        },
+
         init() {
             console.log('adminMember Alpine.js component initializing...');
 
@@ -37,21 +47,54 @@ function adminMember() {
                     this.editMemberId = null;
                 }
             });
-        },
 
-        // Computed property for filtered members
-        get filteredMembers() {
-            console.log('filteredMembers computed property accessed. Search:', this.search);
-            if (!this.search) {
-                console.log('No search term, returning all members.');
-                return this.members;
-            }
-            const searchLower = this.search.toLowerCase();
-            return this.members.filter(member => 
-                (member.customId && member.customId.toLowerCase().includes(searchLower)) ||
-                member.fullname.toLowerCase().includes(searchLower) ||
-                member.icNum.toLowerCase().includes(searchLower)
-            );
+            this.$watch('editMemberId', id => {
+                if (id) {
+                    console.log('editMemberId changed to:', id);
+                    const memberToEdit = this.members.find(m => m._id === id);
+                    if (memberToEdit) {
+                        console.log('Found member to edit:', memberToEdit);
+                        Object.assign(this.member, {
+                            _id: memberToEdit._id || '',
+                            customId: memberToEdit.customId || '',
+                            fullname: memberToEdit.fullname || '',
+                            username: memberToEdit.username || '',
+                            email: memberToEdit.email || '',
+                            icNum: memberToEdit.icNum || '',
+                            birthDate: memberToEdit.birthDate ? new Date(memberToEdit.birthDate).toISOString().split('T')[0] : '',
+                            age: memberToEdit.age || '',
+                            phoneNum: memberToEdit.phoneNum || '',
+                            address: memberToEdit.address || '',
+                            status: memberToEdit.status || ''
+                        });
+                        console.log('Member data set via $watch:', this.member);
+
+                        // Force DOM update for specific elements after data is set
+                        this.$nextTick(() => {
+                            console.log('Attempting to manually prefill form fields...');
+                            const form = this.$el.querySelector('form[action*="/adminmembers/edit/"]');
+                            if (form) {
+                                // Select input fields by name and set their values
+                                const fields = ['fullname', 'username', 'email', 'icNum', 'birthDate', 'phoneNum', 'address'];
+                                fields.forEach(fieldName => {
+                                    const input = form.querySelector(`[name="${fieldName}"]`);
+                                    if (input && this.member[fieldName] !== undefined) {
+                                        input.value = this.member[fieldName];
+                                        console.log(`Set ${fieldName} to: ${input.value}`);
+                                    }
+                                });
+
+                                // Handle select element separately
+                                const statusSelect = form.querySelector('[name="status"]');
+                                if (statusSelect && this.member.status !== undefined) {
+                                    statusSelect.value = this.member.status;
+                                    console.log(`Set status to: ${statusSelect.value}`);
+                                }
+                            }
+                        });
+                    }
+                }
+            });
         },
 
         openAddModal() {
@@ -63,20 +106,8 @@ function adminMember() {
         openEditModal(memberData) {
             console.log('Opening edit modal with data:', memberData);
             this.modalType = 'edit';
-            this.member = {
-                _id: memberData._id,
-                customId: memberData.customId,
-                fullname: memberData.fullname,
-                username: memberData.username,
-                email: memberData.email,
-                icNum: memberData.icNum,
-                birthDate: this.formatDate(memberData.birthDate),
-                age: memberData.age,
-                phoneNum: memberData.phoneNum,
-                address: memberData.address,
-                status: memberData.status
-            };
             this.showModal = true;
+            this.editMemberId = memberData._id;
         },
 
         openDeleteModal(id) {
@@ -114,7 +145,7 @@ function adminMember() {
             if (!dateString) return '';
             const date = new Date(dateString);
             const year = date.getFullYear();
-            const month = String(date.getMonth() + 1).padStart(2, '0'); // Months are 0-indexed
+            const month = String(date.getMonth() + 1).padStart(2, '0');
             const day = String(date.getDate()).padStart(2, '0');
             return `${year}-${month}-${day}`;
         }

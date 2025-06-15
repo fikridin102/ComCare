@@ -49,6 +49,7 @@ function adminEvent() {
         deleteEventId: null,
         search: '',
         events: [], // Will be populated from JSON script tag
+        pendingEventData: null, // New property to temporarily hold event data
 
         init() {
             console.log('adminEvent Alpine.js component initializing...');
@@ -62,7 +63,27 @@ function adminEvent() {
             console.log('Initialized events:', this.events);
 
             this.$watch('showModal', value => {
-                if (!value) {
+                if (value) {
+                    // When modal opens, populate the event data from pendingEventData
+                    this.$nextTick(() => {
+                        if (this.pendingEventData) {
+                            const eventData = this.pendingEventData;
+                            const formattedDate = eventData.date ? this.formatDate(eventData.date) : '';
+                            this.event = {
+                                _id: eventData._id || '',
+                                eventId: eventData.eventId || '',
+                                name: eventData.name || '',
+                                venue: eventData.venue || '',
+                                date: formattedDate,
+                                time: eventData.time || '',
+                                budget: eventData.budget || '',
+                                remarks: eventData.remarks || ''
+                            };
+                            console.log('Set event data for editing via $watch:', this.event);
+                            this.pendingEventData = null; // Clear pending data
+                        }
+                    });
+                } else {
                     this.resetForm();
                     this.editEventId = null;
                 }
@@ -91,19 +112,11 @@ function adminEvent() {
         },
 
         openEditModal(eventData) {
-            console.log('Opening edit modal with data:', eventData);
+            console.log('Opening edit modal with raw data:', eventData);
             this.modalType = 'edit';
-            this.event = {
-                _id: eventData._id,
-                eventId: eventData.eventId,
-                name: eventData.name,
-                venue: eventData.venue,
-                date: this.formatDate(eventData.date),
-                time: eventData.time,
-                budget: eventData.budget,
-                remarks: eventData.remarks
-            };
-            this.showModal = true;
+            this.pendingEventData = eventData; // Store data temporarily
+            this.showModal = true; // Open modal, data will be set by $watch
+            console.log('Stored pending event data and opening modal.');
         },
 
         openDeleteModal(id) {
@@ -141,6 +154,40 @@ function adminEvent() {
             const month = String(date.getMonth() + 1).padStart(2, '0'); // Months are 0-indexed
             const day = String(date.getDate()).padStart(2, '0');
             return `${year}-${month}-${day}`;
+        },
+
+        async submitEditForm() {
+            try {
+                console.log('Submitting edit form for event:', this.event);
+                
+                const formData = new FormData();
+                formData.append('_csrf', document.querySelector('input[name="_csrf"]').value);
+                formData.append('id', this.event._id);
+                formData.append('name', this.event.name);
+                formData.append('venue', this.event.venue);
+                formData.append('date', this.event.date);
+                formData.append('time', this.event.time);
+                formData.append('budget', this.event.budget);
+                formData.append('remarks', this.event.remarks);
+
+                const response = await fetch(`/adminevent/edit/${this.event._id}`, {
+                    method: 'POST',
+                    body: formData,
+                    headers: {
+                        'Accept': 'application/json'
+                    }
+                });
+
+                if (response.ok) {
+                    window.location.reload();
+                } else {
+                    console.error('Error updating event:', response.statusText);
+                    alert('Error updating event. Please try again.');
+                }
+            } catch (error) {
+                console.error('Error submitting form:', error);
+                alert('Error updating event. Please try again.');
+            }
         }
     };
 } 

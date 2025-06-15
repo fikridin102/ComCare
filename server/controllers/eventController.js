@@ -74,11 +74,18 @@ exports.editEvent = async (req, res) => {
     try {
         const eventId = req.params.id;
         const { name, venue, date, time, budget, remarks } = req.body;
+
+        console.log(`[editEvent] Received eventId: ${eventId}`);
+        console.log(`[editEvent] Received req.body:`, req.body);
+
         const updated = await Event.findByIdAndUpdate(
             eventId,
             { name, venue, date, time, budget, remarks },
             { new: true }
         );
+
+        console.log(`[editEvent] Result of findByIdAndUpdate:`, updated);
+
         if (!updated) {
             req.flash("error", "Event not found");
             return res.redirect("/adminevent");

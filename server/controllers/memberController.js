@@ -288,13 +288,13 @@ exports.updateMemberStatus = async (req, res) => {
     try {
         const memberId = req.params.id;
         const { status } = req.body;
-
+        
         const member = await User.findById(memberId);
         if (!member) {
             req.flash("error", "Member not found");
             return res.redirect("/adminmember");
         }
-
+        
         const oldStatus = member.status;
         member.status = status;
         await member.save();
