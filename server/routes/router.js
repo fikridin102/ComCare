@@ -59,16 +59,12 @@ router.get("/memberIndex", isAuthenticated, isMember, async (req, res) => {
     });
 });
 
-router.get("/userprofile", isAuthenticated, isMember, async (req, res) => {
-    const user = await User.findById(req.session.user.id);
-    res.render("userprofile", {
-        user,
-        csrfToken: req.csrfToken(),
-        messages: {
-            error: req.flash('error'),
-            success: req.flash('success')
-        }
-    });
+router.get("/memberdashboard", isAuthenticated, isMember, (req, res) => {
+    res.render('memberDashboard', { user: req.session.user });
+});
+
+router.get("/userprofile", isAuthenticated, isMember, (req, res) => {
+    res.render('userProfile', { user: req.session.user, csrfToken: req.csrfToken() });
 });
 
 // Member Dependant Routes
