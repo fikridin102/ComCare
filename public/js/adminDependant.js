@@ -1,8 +1,8 @@
 function adminDependant() {
     return {
         showModal: false,
-        showDeleteModal: false,
         modalType: '',
+        editDependantId: null,
         dependant: {
             _id: '',
             name: '',
@@ -13,6 +13,7 @@ function adminDependant() {
             relationship: '',
             memberId: ''
         },
+        showDeleteModal: false,
         deleteDependantId: null,
         search: '',
         dependants: [],
@@ -25,6 +26,7 @@ function adminDependant() {
             const rawDependantsString = document.getElementById('raw-dependants-json').textContent;
             this.dependants = JSON.parse(rawDependantsString).map(d => ({
                 ...d,
+                _id: d._id || d.id,
                 birthday: d.birthday ? new Date(d.birthday).toISOString().split('T')[0] : '' // Format date for input type="date"
             }));
             console.log('Initialized dependants:', this.dependants);
@@ -33,13 +35,33 @@ function adminDependant() {
             this.members = JSON.parse(rawMembersString);
             console.log('Initialized members:', this.members);
 
-            this.memberName = '<%- user.fullname || user.username %>'; // Keep this if memberName is needed from EJS
-
             this.$watch('showModal', value => {
                 if (!value) {
                     this.resetForm();
+                    this.editDependantId = null;
                 }
-                });
+            });
+
+            this.$watch('modalType', value => {
+                console.log('Modal type changed to:', value);
+                if (value === 'edit' && this.editDependantId) {
+                    const dependantToEdit = this.dependants.find(d => d._id === this.editDependantId);
+                    if (dependantToEdit) {
+                        console.log('Found dependant to edit:', dependantToEdit);
+                        Object.assign(this.dependant, {
+                            _id: dependantToEdit._id || '',
+                            name: dependantToEdit.name || '',
+                            ic: dependantToEdit.ic || '',
+                            birthday: dependantToEdit.birthday ? new Date(dependantToEdit.birthday).toISOString().split('T')[0] : '',
+                            age: dependantToEdit.age || '',
+                            gender: dependantToEdit.gender || '',
+                            relationship: dependantToEdit.relationship || '',
+                            memberId: dependantToEdit.memberId || ''
+                        });
+                        console.log('Dependant data set via $watch:', this.dependant);
+                    }
+                }
+            });
         },
 
         calculateAge(birthday) {
@@ -57,11 +79,7 @@ function adminDependant() {
         },
 
         get filteredDependants() {
-            console.log('filteredDependants computed property accessed. Search:', this.search);
-            if (!this.search) {
-                console.log('No search term, returning all dependants.');
-                return this.dependants;
-            }
+            if (!this.search) return this.dependants;
             const searchLower = this.search.toLowerCase();
             return this.dependants.filter(dependant => 
                 (dependant.name && dependant.name.toLowerCase().includes(searchLower)) ||
@@ -70,17 +88,17 @@ function adminDependant() {
             );
         },
 
-        openEditModal(dependantData) {
-            console.log('Opening edit modal with data:', dependantData);
-            this.modalType = 'edit';
-            this.showModal = true;
-            this.editDependatId = dependantData._id;
-        },
-
         openAddModal() {
             this.modalType = 'add';
             this.resetForm();
             this.showModal = true;
+        },
+
+        openEditModal(dependantData) {
+            console.log('Opening edit modal with data:', dependantData);
+            this.modalType = 'edit';
+            this.showModal = true;
+            this.editDependantId = dependantData._id;
         },
 
         openDeleteModal(id) {
@@ -115,7 +133,7 @@ function adminDependant() {
             if (!dateString) return '';
             const date = new Date(dateString);
             const year = date.getFullYear();
-            const month = String(date.getMonth() + 1).padStart(2, '0'); // Months are 0-indexed
+            const month = String(date.getMonth() + 1).padStart(2, '0');
             const day = String(date.getDate()).padStart(2, '0');
             return `${year}-${month}-${day}`;
         },
