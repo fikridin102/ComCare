@@ -6,32 +6,151 @@
         <div class="flex flex-col items-center">
             <div class="w-full bg-white p-6">
                 <div class="text-2xl font-bold mb-8 text-center">Admin Dashboard</div>
-                <div class="grid grid-cols-1 md:grid-cols-4 gap-6 mb-8">
+                
+                <!-- Member Statistics -->
+                <div class="grid grid-cols-1 md:grid-cols-2 gap-6 mb-8">
                     <div class="bg-blue-100 p-6 rounded shadow text-center">
                         <div class="text-3xl font-bold"><%= totalMembers %></div>
-                        <div class="text-gray-700 mt-2">Members</div>
+                        <div class="text-gray-700 mt-2">Total Members</div>
                     </div>
                     <div class="bg-green-100 p-6 rounded shadow text-center">
-                        <div class="text-3xl font-bold"><%= totalDependants %></div>
-                        <div class="text-gray-700 mt-2">Dependants</div>
+                        <div class="text-3xl font-bold"><%= totalActiveMembers %></div>
+                        <div class="text-gray-700 mt-2">Active Members</div>
                     </div>
+                </div>
+
+                <!-- Payment Statistics -->
+                <div class="grid grid-cols-1 md:grid-cols-3 gap-6 mb-8">
                     <div class="bg-yellow-100 p-6 rounded shadow text-center">
-                        <div class="text-3xl font-bold"><%= totalPayments %></div>
-                        <div class="text-gray-700 mt-2">Payments</div>
+                        <div class="text-3xl font-bold">RM <%= totalKhairat.toFixed(2) %></div>
+                        <div class="text-gray-700 mt-2">Total Khairat Fees</div>
                     </div>
                     <div class="bg-purple-100 p-6 rounded shadow text-center">
-                        <div class="text-3xl font-bold"><%= totalClaims %></div>
-                        <div class="text-gray-700 mt-2">Claims</div>
+                        <div class="text-3xl font-bold">RM <%= totalMaintenance.toFixed(2) %></div>
+                        <div class="text-gray-700 mt-2">Total Maintenance Fees</div>
+                    </div>
+                    <div class="bg-indigo-100 p-6 rounded shadow text-center">
+                        <div class="text-3xl font-bold"><%= totalPayments %></div>
+                        <div class="text-gray-700 mt-2">Total Transactions</div>
                     </div>
                 </div>
-                <div class="flex flex-wrap justify-center gap-4">
-                    <a href="/adminmember" class="bg-blue-500 hover:bg-blue-600 text-white px-6 py-3 rounded shadow transition">Manage Members</a>
-                    <a href="/admin/dependants" class="bg-green-500 hover:bg-green-600 text-white px-6 py-3 rounded shadow transition">Manage Dependants</a>
-                    <a href="/adminpayment" class="bg-yellow-500 hover:bg-yellow-600 text-white px-6 py-3 rounded shadow transition">View Payments</a>
-                    <a href="/adminclaim" class="bg-purple-500 hover:bg-purple-600 text-white px-6 py-3 rounded shadow transition">View Claims</a>
-                    <a href="/adminevent" class="bg-pink-500 hover:bg-pink-600 text-white px-6 py-3 rounded shadow transition">Manage Events</a>
-                    <a href="/adminannouncement" class="bg-indigo-500 hover:bg-indigo-600 text-white px-6 py-3 rounded shadow transition">Manage Announcements</a>
+
+                <!-- Statistics and Graph Section -->
+                <div class="grid grid-cols-1 lg:grid-cols-2 gap-6 mt-10">
+                    <!-- Registration Graph -->
+                    <div class="bg-white p-6 rounded shadow">
+                        <div class="flex justify-between items-center mb-4">
+                            <div class="text-xl font-semibold">User Registration Statistics</div>
+                            <div class="relative">
+                                <select id="periodFilter" onchange="updateGraph(this.value)" class="appearance-none bg-white border border-gray-300 rounded px-4 py-2 pr-8 leading-tight focus:outline-none focus:border-blue-500">
+                                    <option value="week">Last 7 Days</option>
+                                    <option value="month" selected>Last 30 Days</option>
+                                    <option value="year">Last 12 Months</option>
+                                </select>
+                                <div class="pointer-events-none absolute inset-y-0 right-0 flex items-center px-2 text-gray-700">
+                                    <svg class="fill-current h-4 w-4" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20">
+                                        <path d="M9.293 12.95l.707.707L15.657 8l-1.414-1.414L10 10.828 5.757 6.586 4.343 8z"/>
+                                    </svg>
+                                </div>
+                            </div>
+                        </div>
+                        <canvas id="registrationChart" height="100"></canvas>
+                    </div>
+
+                    <!-- Latest Announcements -->
+                    <div class="bg-white p-6 rounded shadow">
+                        <div class="flex justify-between items-center mb-4">
+                            <div class="text-xl font-semibold">Latest Announcements</div>
+                            <a href="/adminannouncement" class="text-blue-500 hover:text-blue-600 text-sm">View All</a>
+                        </div>
+                        <div class="space-y-4">
+                            <% if (announcements && announcements.length > 0) { %>
+                                <% announcements.forEach(announcement => { %>
+                                    <div class="border-b border-gray-200 pb-4 last:border-b-0 last:pb-0">
+                                        <div class="flex justify-between items-start">
+                                            <div>
+                                                <h3 class="font-semibold text-gray-800"><%= announcement.title %></h3>
+                                                <p class="text-sm text-gray-600 mt-1 line-clamp-2"><%= announcement.content %></p>
+                                            </div>
+                                            <div class="text-xs text-gray-500">
+                                                <%= format(new Date(announcement.date), 'MMM d, yyyy') %>
+                                            </div>
+                                        </div>
+                                        <% if (announcement.image) { %>
+                                            <div class="mt-2">
+                                                <img src="<%= announcement.image %>" alt="Announcement image" class="w-20 h-20 object-cover rounded">
+                                            </div>
+                                        <% } %>
+                                    </div>
+                                <% }); %>
+                            <% } else { %>
+                                <div class="text-gray-500 text-center py-4">No announcements available</div>
+                            <% } %>
+                        </div>
+                    </div>
                 </div>
+
+                <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+                <script>
+                let registrationChart = null;
+
+                function updateGraph(period) {
+                    fetch(`/api/user-registration-stats?period=${period}`)
+                        .then(res => res.json())
+                        .then(result => {
+                            if (!result.success) throw new Error(result.message);
+                            
+                            const labels = result.data.map(d => d.label);
+                            const data = result.data.map(d => d.count);
+
+                            if (registrationChart) {
+                                registrationChart.destroy();
+                            }
+
+                            const ctx = document.getElementById('registrationChart').getContext('2d');
+                            registrationChart = new Chart(ctx, {
+                                type: 'line',
+                                data: {
+                                    labels: labels,
+                                    datasets: [{
+                                        label: 'Registrations',
+                                        data: data,
+                                        borderColor: 'rgba(54, 162, 235, 1)',
+                                        backgroundColor: 'rgba(54, 162, 235, 0.2)',
+                                        fill: true,
+                                        tension: 0.3,
+                                        pointRadius: 4,
+                                        pointBackgroundColor: 'rgba(54, 162, 235, 1)'
+                                    }]
+                                },
+                                options: {
+                                    responsive: true,
+                                    plugins: {
+                                        legend: { display: false },
+                                        title: {
+                                            display: false
+                                        }
+                                    },
+                                    scales: {
+                                        y: {
+                                            beginAtZero: true,
+                                            ticks: { stepSize: 1 }
+                                        }
+                                    }
+                                }
+                            });
+                        })
+                        .catch(err => {
+                            document.getElementById('registrationChart').parentElement.innerHTML += 
+                                `<div class='text-red-500 mt-2'>Failed to load registration graph.</div>`;
+                        });
+                }
+
+                // Initialize with month view
+                document.addEventListener('DOMContentLoaded', function() {
+                    updateGraph('month');
+                });
+                </script>
                 <%- include('include/footer') %>
             </div>
         </div>

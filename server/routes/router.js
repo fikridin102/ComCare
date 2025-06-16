@@ -220,4 +220,7 @@ const authController = require("../controllers/authController");
 router.get("/reset-password", authController.resetPasswordPage);
 router.post("/reset-password", authController.resetPassword);
 
+// API endpoint for user registration stats (for admin dashboard graph)
+router.get("/api/user-registration-stats", isAuthenticated, isAdmin, adminController.getUserRegistrationStats);
+
 module.exports = router;

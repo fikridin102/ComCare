@@ -74,17 +74,7 @@ function adminDependant() {
             console.log('Opening edit modal with data:', dependantData);
             this.modalType = 'edit';
             this.showModal = true;
-            this.dependant = {
-                _id: dependantData._id,
-                name: dependantData.name,
-                ic: dependantData.ic,
-                birthday: this.formatDate(dependantData.birthday),
-                age: dependantData.age,
-                gender: dependantData.gender,
-                relationship: dependantData.relationship,
-                memberId: dependantData.memberId
-            };
-            console.log('Set dependant data:', this.dependant);
+            this.editDependatId = dependantData._id;
         },
 
         openAddModal() {
