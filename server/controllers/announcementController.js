@@ -5,7 +5,7 @@ exports.getAdminAnnouncement = async (req, res) => {
     try {
         const announcements = await Announcement.find().sort({ date: -1 });
         
-        res.render('adminannouncement', {
+        res.render('adminAnnouncement', {
             announcements,
             messages: {
                 error: req.flash('error'),
