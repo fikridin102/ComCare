@@ -44,14 +44,14 @@
 <div class="text-2xl font-bold mb-2 mt-8 text-center">
     Welcome, <%= user.fullname || user.username %>!
 </div>
-<p class="text-center text-gray-600 mb-8">
-    This is your member dashboard. Here you can manage your dependants, view and pay your khairat fees, and access important announcements.
-</p>
 
-<div class="flex justify-center gap-6 mb-8">
-    <a href="/memberdependant" class="bg-blue-500 hover:bg-blue-600 text-white px-6 py-3 rounded shadow transition">Manage Dependants</a>
-    <a href="/memberpayment" class="bg-green-500 hover:bg-green-600 text-white px-6 py-3 rounded shadow transition">View/Pay Khairat Fees</a>
-    <a href="/memberclaim" class="bg-yellow-500 hover:bg-yellow-600 text-white px-6 py-3 rounded shadow transition">Claim Khairat</a>
+
+<!-- Digital Clock -->
+<div class="flex justify-center mb-4">
+    <div class="bg-gray-800 text-white p-4 rounded-lg shadow-lg">
+        <div class="text-4xl font-mono text-center" id="digital-clock">00:00:00</div>
+        <div class="text-sm text-center text-gray-400" id="digital-date">Loading...</div>
+    </div>
 </div>
 
 <div class="flex justify-center gap-8 mb-8">
@@ -59,9 +59,85 @@
         <div class="text-3xl font-bold text-red-600"><%= overduePayments ? overduePayments.length : 0 %></div>
         <div class="text-gray-700 mt-2">Unpaid Khairat Fees</div>
     </div>
+    <div class="bg-white shadow rounded p-6 text-center w-64">
+        <div class="text-3xl font-bold text-blue-600"><%= totalClaims %></div>
+        <div class="text-gray-700 mt-2">Total Claims</div>
+        <div class="text-sm text-gray-500 mt-1">RM <%= totalClaimAmount.toFixed(2) %></div>
+    </div>
+    <div class="bg-white shadow rounded p-6 text-center w-64">
+        <div class="text-3xl font-bold text-green-600"><%= approvedClaims %></div>
+        <div class="text-gray-700 mt-2">Approved Claims</div>
+        <div class="text-sm text-gray-500 mt-1">RM <%= approvedClaimAmount.toFixed(2) %></div>
+    </div>
+</div>
+
+<!-- Dependant List Section -->
+<div class="w-full max-w-4xl mx-auto bg-white rounded-lg shadow-lg p-6 mb-8">
+    <div class="flex justify-between items-center mb-4">
+        <h2 class="text-xl font-semibold">Recent Dependants</h2>
+        <a href="/memberdependant" class="text-blue-500 hover:text-blue-600 text-sm">View All</a>
+    </div>
+    
+    <% if (dependants && dependants.length > 0) { %>
+        <div class="overflow-x-auto">
+            <table class="w-full border-collapse border border-gray-300">
+                <thead>
+                    <tr class="bg-gray-100">
+                        <th class="border border-gray-300 px-4 py-2 text-left">Name</th>
+                        <th class="border border-gray-300 px-4 py-2 text-left">IC Number</th>
+                        <th class="border border-gray-300 px-4 py-2 text-left">Age</th>
+                        <th class="border border-gray-300 px-4 py-2 text-left">Gender</th>
+                        <th class="border border-gray-300 px-4 py-2 text-left">Relationship</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    <% dependants.forEach(dependant => { %>
+                        <tr class="hover:bg-gray-50">
+                            <td class="border border-gray-300 px-4 py-2"><%= dependant.name %></td>
+                            <td class="border border-gray-300 px-4 py-2"><%= dependant.ic %></td>
+                            <td class="border border-gray-300 px-4 py-2"><%= dependant.age %></td>
+                            <td class="border border-gray-300 px-4 py-2"><%= dependant.gender %></td>
+                            <td class="border border-gray-300 px-4 py-2"><%= dependant.relationship %></td>
+                        </tr>
+                    <% }); %>
+                </tbody>
+            </table>
+        </div>
+    <% } else { %>
+        <div class="text-center py-4 text-gray-500">
+            No dependants found. Click "Manage Dependants" to add new dependants.
+        </div>
+    <% } %>
 </div>
 
 <script>
+// Digital Clock
+function updateClock() {
+    const now = new Date();
+    
+    // Update time
+    const time = now.toLocaleTimeString('en-US', { 
+        hour12: false,
+        hour: '2-digit',
+        minute: '2-digit',
+        second: '2-digit'
+    });
+    document.getElementById('digital-clock').textContent = time;
+    
+    // Update date
+    const date = now.toLocaleDateString('en-US', {
+        weekday: 'long',
+        year: 'numeric',
+        month: 'long',
+        day: 'numeric'
+    });
+    document.getElementById('digital-date').textContent = date;
+}
+
+// Update clock immediately and then every second
+updateClock();
+setInterval(updateClock, 1000);
+
 document.addEventListener('DOMContentLoaded', function() {
     // Only show the modal if not already shown this session
     if (!sessionStorage.getItem('announcementShown')) {

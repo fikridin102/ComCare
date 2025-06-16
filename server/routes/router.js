@@ -18,6 +18,7 @@ const nodemailer = require('nodemailer'); // Import nodemailer
 const Dependant = require('../models/dependant');
 const { sendEmail } = require('../utils/emailer');
 const multer = require('multer'); // Re-import multer here to ensure it's available in this scope
+const Claim = require('../models/claim');
 
 // Setup CSRF Protection locally in router.js
 // const csrfProtection = csrf({ cookie: false });
@@ -49,9 +50,31 @@ router.get("/memberIndex", isAuthenticated, isMember, async (req, res) => {
         status: { $ne: 'Paid' },
         dueDate: { $lt: new Date() }
     });
+
+    // Get total claims and approved claims
+    const totalClaims = await Claim.find({ memberId: userId });
+    const approvedClaims = await Claim.find({ 
+        memberId: userId,
+        status: 'Approved'
+    });
+
+    // Calculate total amount
+    const totalClaimAmount = totalClaims.reduce((sum, claim) => sum + claim.amount, 0);
+    const approvedClaimAmount = approvedClaims.reduce((sum, claim) => sum + claim.amount, 0);
+
+    // Get dependants
+    const dependants = await Dependant.find({ memberId: userId })
+        .sort({ createdAt: -1 })
+        .limit(5); // Show only the 5 most recent dependants
+
     res.render("memberIndex", {
         user: req.session.user,
         overduePayments,
+        totalClaims: totalClaims.length,
+        approvedClaims: approvedClaims.length,
+        totalClaimAmount,
+        approvedClaimAmount,
+        dependants,
         messages: {
             error: req.flash('error'),
             success: req.flash('success')
