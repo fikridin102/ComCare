@@ -46,7 +46,7 @@
                                         </td>
                                     <td class="border border-gray-300 px-4 py-2" x-text="new Date(announcement.date).toLocaleDateString()"></td>
                                         <td class="border border-gray-300 px-4 py-2 text-center">
-                                        <button @click="console.log('Edit button clicked for ID:', announcement._id); openEditModal(announcement._id)">
+                                        <button @click="openEditModal(announcement)" class="hover:opacity-75">
                                                 <img src="/assets/images/edit.png" class="w-5 h-5">
                                             </button>
                                         <button @click="showDeleteModal = true; deleteAnnouncementId = announcement._id">
@@ -240,11 +240,12 @@ document.addEventListener('alpine:init', () => {
     // Retrieve the stringified announcements data from the new script tag
     const rawAnnouncementsString = document.getElementById('raw-announcements-json').textContent;
     const parsedAnnouncements = JSON.parse(rawAnnouncementsString);
-    console.log('Parsed announcements data:', parsedAnnouncements); // Debug log for parsed data
+    console.log('Parsed announcements data:', parsedAnnouncements);
 
     Alpine.data('mainContent', () => ({
         showModal: false,
         modalType: '',
+        pendingAnnouncementData: null,
         announcement: {
             _id: '',
             announcementId: '',
@@ -255,11 +256,47 @@ document.addEventListener('alpine:init', () => {
         showDeleteModal: false,
         deleteAnnouncementId: null,
         search: '',
-        announcements: parsedAnnouncements, // Assign the parsed data here
+        announcements: parsedAnnouncements,
+
+        init() {
+            this.$watch('showModal', value => {
+                if (value) {
+                    // When modal opens, populate the announcement data from pendingAnnouncementData
+                    this.$nextTick(() => {
+                        if (this.pendingAnnouncementData) {
+                            const announcementData = this.pendingAnnouncementData;
+                            this.announcement = {
+                                _id: announcementData._id || '',
+                                announcementId: announcementData.announcementId || '',
+                                title: announcementData.title || '',
+                                content: announcementData.content || '',
+                                image: announcementData.image || null
+                            };
+                            console.log('Set announcement data for editing via $watch:', this.announcement);
+                            this.pendingAnnouncementData = null; // Clear pending data
+                        }
+                    });
+                } else {
+                    this.resetForm();
+                }
+            });
+        },
 
         openAddModal() {
             console.log('Opening add modal');
             this.modalType = 'add';
+            this.resetForm();
+            this.showModal = true;
+        },
+
+        openEditModal(announcementData) {
+            console.log('Opening edit modal with data:', announcementData);
+            this.modalType = 'edit';
+            this.pendingAnnouncementData = announcementData;
+            this.showModal = true;
+        },
+
+        resetForm() {
             this.announcement = {
                 _id: '',
                 announcementId: '',
@@ -267,28 +304,6 @@ document.addEventListener('alpine:init', () => {
                 content: '',
                 image: null
             };
-            this.showModal = true;
-            console.log('Add modal state:', { modalType: this.modalType, announcement: this.announcement });
-        },
-
-        openEditModal(announcementId) {
-            console.log('Attempting to open edit modal for ID:', announcementId);
-            const announcementData = this.announcements.find(ann => ann._id === announcementId);
-            if (announcementData) {
-                this.modalType = 'edit';
-                // Deep copy the announcementData to ensure reactivity and prevent direct mutation of original data
-                this.announcement = {
-                    _id: announcementData._id,
-                    announcementId: announcementData.announcementId,
-                    title: announcementData.title,
-                    content: announcementData.content,
-                    image: announcementData.image || null
-                };
-                this.showModal = true;
-                console.log('Edit modal state after update:', { modalType: this.modalType, announcement: this.announcement });
-            } else {
-                console.error('Announcement with ID', announcementId, 'not found.');
-            }
         },
 
         handleImageUpload(event) {
@@ -301,23 +316,13 @@ document.addEventListener('alpine:init', () => {
             }
         },
 
-        // Filter announcements based on search
         get filteredAnnouncements() {
-            console.log('filteredAnnouncements computed property accessed.');
-            console.log('Current search term:', this.search);
-            console.log('Original announcements count:', this.announcements.length);
-
-            if (!this.search) {
-                console.log('No search term, returning all announcements.');
-                return this.announcements;
-            }
+            if (!this.search) return this.announcements;
             const searchLower = this.search.toLowerCase();
-            const filtered = this.announcements.filter(announcement => 
+            return this.announcements.filter(announcement => 
                 announcement.announcementId.toLowerCase().includes(searchLower) ||
                 announcement.title.toLowerCase().includes(searchLower)
             );
-            console.log('Filtered announcements count:', filtered.length);
-            return filtered;
         }
     }));
 });
